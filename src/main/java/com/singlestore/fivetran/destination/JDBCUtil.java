@@ -10,7 +10,9 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Properties;
+import java.util.stream.Collectors;
 
 public class JDBCUtil {
     static Connection createConnection(SingleStoreDBConfiguration conf) throws java.sql.SQLException{
@@ -40,12 +42,23 @@ public class JDBCUtil {
     }
 
     static String getColumnDefinitions(List<Column> columns) {
-        List<String> columnsDefinitions = new ArrayList<>();
-        for (Column col: columns) {
-            columnsDefinitions.add(getColumnDefinition(col));
-        }
+        List<String> columnsDefinitions = columns.stream().map(
+                JDBCUtil::getColumnDefinition
+        ).collect(Collectors.toList());
 
-        // TODO: add primary key
+
+        List<String> primaryKeyColumns = columns.stream().map(
+                column -> escapeIdentifier(column.getName())
+        ).collect(Collectors.toList());
+
+        Optional<String> primaryKeyDefinition;
+        if (primaryKeyColumns.isEmpty()) {
+            primaryKeyDefinition = Optional.empty();
+        } else {
+            primaryKeyDefinition = Optional.of(
+                    
+            )
+        }
         return Strings.join(columnsDefinitions, ",\n");
     }
     static String getColumnDefinition(Column col) {

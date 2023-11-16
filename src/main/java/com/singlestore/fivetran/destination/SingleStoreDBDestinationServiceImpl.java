@@ -156,12 +156,4 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
         responseObserver.onNext(WriteBatchResponse.newBuilder().setSuccess(true).build());
         responseObserver.onCompleted();
     }
-
-    private void createConnection(Map<String, String> configuration) {
-        String host = configuration.get("host");
-        String port = configuration.get("port");
-        String user = configuration.get("user");
-        String password = configuration.get("password");
-
-    }
 }
