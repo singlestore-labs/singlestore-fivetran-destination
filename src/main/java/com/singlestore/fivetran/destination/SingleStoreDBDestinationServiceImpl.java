@@ -59,45 +59,18 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
         String database = request.getSchemaName();
         String table = request.getTableName();
 
-        try (Connection conn = JDBCUtil.createConnection(conf)) {
-            DatabaseMetaData metadata=conn.getMetaData();
-
-            try (ResultSet tables = metadata.getTables(database, null, table, null)) {
-                if (!tables.next()) {
-                    DescribeTableResponse response = DescribeTableResponse.newBuilder()
-                            .setNotFound(true)
-                            .build();
-
-                    responseObserver.onNext(response);
-                    responseObserver.onCompleted();
-                    return;
-                }
-                // TODO: handle case when several tables are returned
-            }
-
-            Set<String> primaryKeys = new HashSet<>();
-            try (ResultSet primaryKeysRS = metadata.getPrimaryKeys(database, null, table)) {
-                primaryKeys.add(primaryKeysRS.getString("COLUMN_NAME"));
-            }
-
-            List<Column> columns = new ArrayList<>();
-            try (ResultSet columnsRS = metadata.getColumns(database, null, table, null)) {
-                while(columnsRS.next()) {
-                    columns.add(Column.newBuilder()
-                            .setName(columnsRS.getString("COLUMN_NAME"))
-                            .setType(JDBCUtil.mapDataTypes(columnsRS.getInt("DATA_TYPE"), columnsRS.getString("TYPE_NAME")))
-                            .setPrimaryKey(primaryKeys.contains(columnsRS.getString("COLUMN_NAME")))
-                            // TODO: get scale and precision
-                            .build());
-                }
-            }
+        try {
+            Table t = JDBCUtil.getTable(conf, database, table);
 
             DescribeTableResponse response = DescribeTableResponse.newBuilder()
-                    .setTable(
-                            Table.newBuilder()
-                                    .setName(request.getTableName())
-                                    .addAllColumns(columns)
-                                    .build())
+                    .setTable(t)
+                    .build();
+
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+        } catch (JDBCUtil.TableNotExistException e) {
+            DescribeTableResponse response = DescribeTableResponse.newBuilder()
+                    .setNotFound(true)
                     .build();
 
             responseObserver.onNext(response);
@@ -106,6 +79,7 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
             DescribeTableResponse response = DescribeTableResponse.newBuilder()
                     .setFailure(e.getMessage())
                     .build();
+
             responseObserver.onNext(response);
             responseObserver.onCompleted();
         }
@@ -115,28 +89,70 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
     public void createTable(CreateTableRequest request, StreamObserver<CreateTableResponse> responseObserver) {
         SingleStoreDBConfiguration conf = new SingleStoreDBConfiguration(request.getConfigurationMap());
 
-        try (Connection conn = JDBCUtil.createConnection(conf)) {
-            // TODO: implement
+        String query = JDBCUtil.generateCreateTableQuery(request);
+        try (
+                Connection conn = JDBCUtil.createConnection(conf);
+                Statement stmt = conn.createStatement()
+        ) {
+            stmt.execute(query);
         } catch (SQLException e) {
-            // TODO: handle
+            responseObserver.onNext(CreateTableResponse.newBuilder()
+                    .setSuccess(false)
+                    .setFailure(e.getMessage())
+                    .build());
+            responseObserver.onCompleted();
+
+            return;
         }
-        System.out.println("[CreateTable]: " + request.getSchemaName() + " | " + request.getTable().getName());
+
         responseObserver.onNext(CreateTableResponse.newBuilder().setSuccess(true).build());
         responseObserver.onCompleted();
     }
 
     @Override
     public void alterTable(AlterTableRequest request, StreamObserver<AlterTableResponse> responseObserver) {
-        Map<String, String> configuration = request.getConfigurationMap();
+        SingleStoreDBConfiguration conf = new SingleStoreDBConfiguration(request.getConfigurationMap());
 
-        System.out.println("[AlterTable]: " + request.getSchemaName() + " | " + request.getTable().getName());
+        try (
+                Connection conn = JDBCUtil.createConnection(conf);
+                Statement stmt = conn.createStatement()
+        ) {
+            String query = JDBCUtil.generateAlterTableQuery(request);
+            stmt.execute(query);
+        } catch (Exception e) {
+            responseObserver.onNext(AlterTableResponse.newBuilder()
+                    .setSuccess(false)
+                    .setFailure(e.getMessage())
+                    .build());
+            responseObserver.onCompleted();
+
+            return;
+        }
+
         responseObserver.onNext(AlterTableResponse.newBuilder().setSuccess(true).build());
         responseObserver.onCompleted();
     }
 
     @Override
     public void truncate(TruncateRequest request, StreamObserver<TruncateResponse> responseObserver) {
-        System.out.println("[TruncateTable]: " + request.getSchemaName() + " | " + request.getTableName());
+        SingleStoreDBConfiguration conf = new SingleStoreDBConfiguration(request.getConfigurationMap());
+
+        try (
+                Connection conn = JDBCUtil.createConnection(conf);
+                Statement stmt = conn.createStatement()
+        ) {
+            String query = JDBCUtil.generateTruncateTableQuery(request);
+            stmt.execute(query);
+        } catch (Exception e) {
+            responseObserver.onNext(TruncateResponse.newBuilder()
+                    .setSuccess(false)
+                    .setFailure(e.getMessage())
+                    .build());
+            responseObserver.onCompleted();
+
+            return;
+        }
+
         responseObserver.onNext(TruncateResponse.newBuilder().setSuccess(true).build());
         responseObserver.onCompleted();
     }
