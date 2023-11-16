@@ -1,7 +1,6 @@
 package com.singlestore.fivetran.destination;
 
 import fivetran_sdk.*;
-import jdk.internal.joptsimple.internal.Strings;
 
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -21,21 +20,28 @@ public class JDBCUtil {
     }
 
     static Table getTable(SingleStoreDBConfiguration conf, String database, String table) throws Exception {
+        System.out.println("GETTING TABLE: " + database + "|" + table);
         try (Connection conn = JDBCUtil.createConnection(conf)) {
             DatabaseMetaData metadata=conn.getMetaData();
+            System.out.println("AAAAAA1");
 
             try (ResultSet tables = metadata.getTables(database, null, table, null)) {
                 if (!tables.next()) {
+                    System.out.println("AAAAAA");
                     throw new TableNotExistException();
                 }
                 // TODO: handle case when several tables are returned
             }
+            System.out.println("AAAAAA2");
 
             Set<String> primaryKeys = new HashSet<>();
             try (ResultSet primaryKeysRS = metadata.getPrimaryKeys(database, null, table)) {
-                primaryKeys.add(primaryKeysRS.getString("COLUMN_NAME"));
+                while(primaryKeysRS.next()) {
+                    primaryKeys.add(primaryKeysRS.getString("COLUMN_NAME"));
+                }
             }
 
+            System.out.println("AAAAAA3");
             List<Column> columns = new ArrayList<>();
             try (ResultSet columnsRS = metadata.getColumns(database, null, table, null)) {
                 while(columnsRS.next()) {
@@ -48,6 +54,7 @@ public class JDBCUtil {
                 }
             }
 
+            System.out.println("AAAAAA4");
             return Table.newBuilder()
                     .setName(table)
                     .addAllColumns(columns)
@@ -114,6 +121,8 @@ public class JDBCUtil {
 
         Table oldTable = getTable(conf, database, table);
         Table newTable = request.getTable();
+        oldTable.getColumnsList().forEach(column -> System.out.println("Old column " + column.getType()));
+        newTable.getColumnsList().forEach(column -> System.out.println("New column " + column.getType()));
 
         // TODO: throw an exception if PK differs
 
@@ -137,6 +146,10 @@ public class JDBCUtil {
     }
 
     static String generateAlterTableQuery(String database, String table, Set<Column> columnsToDrop, Set<Column> columnsToAdd) {
+        if (columnsToDrop.isEmpty() && columnsToAdd.isEmpty()) {
+            return null;
+        }
+
         List<String> operations = new ArrayList<>();
 
         columnsToDrop.forEach(column ->
@@ -151,7 +164,7 @@ public class JDBCUtil {
         return String.format("ALTER TABLE %s.%s %s",
                 escapeIdentifier(database),
                 escapeIdentifier(table),
-                Strings.join(operations, ", ")
+                String.join(", ", operations)
         );
     }
 
@@ -173,16 +186,17 @@ public class JDBCUtil {
         ).collect(Collectors.toList());
 
 
-        List<String> primaryKeyColumns = columns.stream().map(
-                column -> escapeIdentifier(column.getName())
+        List<String> primaryKeyColumns = columns.stream()
+                .filter(Column::getPrimaryKey)
+                .map(column -> escapeIdentifier(column.getName())
         ).collect(Collectors.toList());
 
         if (!primaryKeyColumns.isEmpty()) {
             columnsDefinitions.add(String.format("PRIMARY KEY (%s)",
-                            Strings.join(primaryKeyColumns, ", ")));
+                            String.join(", ", primaryKeyColumns)));
         }
 
-        return Strings.join(columnsDefinitions, ",\n");
+        return String.join(",\n", columnsDefinitions);
     }
 
     static String getColumnDefinition(Column col) {

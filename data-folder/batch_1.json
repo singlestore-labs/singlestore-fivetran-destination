@@ -20,7 +20,8 @@
         "transaction": {
             "columns": {
                 "id": "INTEGER",
-                "amount" : "FLOAT",
+                "amount1" : "FLOAT",
+                "amount2" : "FLOAT",
                 "desc": "STRING"
             },
             "primary_key": ["id"]

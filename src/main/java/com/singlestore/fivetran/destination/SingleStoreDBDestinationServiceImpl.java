@@ -54,6 +54,7 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
 
     @Override
     public void describeTable(DescribeTableRequest request, StreamObserver<DescribeTableResponse> responseObserver) {
+        System.out.println("DESCRIBE TABLE: " + request.getSchemaName() + "|" + request.getTableName());
         SingleStoreDBConfiguration conf = new SingleStoreDBConfiguration(request.getConfigurationMap());
 
         String database = request.getSchemaName();
@@ -87,6 +88,7 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
 
     @Override
     public void createTable(CreateTableRequest request, StreamObserver<CreateTableResponse> responseObserver) {
+        System.out.println("CREATE TABLE: " + request.getSchemaName() + "|" + request.getTable().getName());
         SingleStoreDBConfiguration conf = new SingleStoreDBConfiguration(request.getConfigurationMap());
 
         String query = JDBCUtil.generateCreateTableQuery(request);
@@ -111,6 +113,12 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
 
     @Override
     public void alterTable(AlterTableRequest request, StreamObserver<AlterTableResponse> responseObserver) {
+        System.out.println("ALTER TABLE: " + request.getSchemaName() + "|" + request.getTable().getName());
+        for (String keys : request.getConfigurationMap().keySet())
+        {
+            System.out.println("MAP KEY: " + keys);
+        }
+
         SingleStoreDBConfiguration conf = new SingleStoreDBConfiguration(request.getConfigurationMap());
 
         try (
@@ -118,7 +126,10 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
                 Statement stmt = conn.createStatement()
         ) {
             String query = JDBCUtil.generateAlterTableQuery(request);
-            stmt.execute(query);
+            if (query != null) {
+                System.out.println("ALTER TABLE QUERY: " + query);
+                stmt.execute(query);
+            }
         } catch (Exception e) {
             responseObserver.onNext(AlterTableResponse.newBuilder()
                     .setSuccess(false)
@@ -135,6 +146,7 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
 
     @Override
     public void truncate(TruncateRequest request, StreamObserver<TruncateResponse> responseObserver) {
+        System.out.println("TRUNCATE TABLE: " + request.getSchemaName() + "|" + request.getTableName());
         SingleStoreDBConfiguration conf = new SingleStoreDBConfiguration(request.getConfigurationMap());
 
         try (

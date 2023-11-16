@@ -1,0 +1,5 @@
+id,name,_fivetran_deleted,_fivetran_synced
+101,Christmas,false,"2023-11-16T14:56:29.376824347Z"
+102,"New Year",false,"2023-11-16T14:56:29.376824347Z"
+201,"Christmas 2",false,"2023-11-16T14:56:29.376824347Z"
+202,"New Year 2",false,"2023-11-16T14:56:29.376824347Z"
