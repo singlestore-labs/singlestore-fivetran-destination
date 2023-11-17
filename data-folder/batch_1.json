@@ -20,8 +20,7 @@
         "transaction": {
             "columns": {
                 "id": "INTEGER",
-                "amount1" : "FLOAT",
-                "amount2" : "FLOAT",
+                "amount" : "DOUBLE",
                 "desc": "STRING"
             },
             "primary_key": ["id"]
@@ -62,7 +61,7 @@
                     {"id":20, "amount": 50, "desc": "mone"}
                 ],
                 "campaign": [
-                    {"id":201, "name": "Christmas 2"},
+                    {"id":201, "name": "Chr,i,s,,,,tmas 2"},
                     {"id":202, "name": "New Year 2"}
                 ]
             }

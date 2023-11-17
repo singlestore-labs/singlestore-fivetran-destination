@@ -1,5 +1,6 @@
 package com.singlestore.fivetran.destination;
 
+import com.singlestore.fivetran.destination.writers.LoadDataWriter;
 import fivetran_sdk.*;
 import io.grpc.stub.StreamObserver;
 
@@ -172,15 +173,37 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
     @Override
     public void writeBatch(WriteBatchRequest request, StreamObserver<WriteBatchResponse> responseObserver) {
         System.out.println("[WriteBatch]: " + request.getSchemaName() + " | " + request.getTable().getName());
-        for (String file : request.getReplaceFilesList()) {
-            System.out.println("Replace files: " + file);
+
+        SingleStoreDBConfiguration conf = new SingleStoreDBConfiguration(request.getConfigurationMap());
+
+        try (
+                Connection conn = JDBCUtil.createConnection(conf);
+                Statement stmt = conn.createStatement()
+        ) {
+            LoadDataWriter w = new LoadDataWriter(stmt, request.getSchemaName(), request.getTable());
+            for (String file : request.getReplaceFilesList()) {
+                System.out.println("Update files: " + file);
+                w.write(file);
+            }
+
+            for (String file : request.getUpdateFilesList()) {
+                System.out.println("Update files: " + file);
+            }
+            for (String file : request.getDeleteFilesList()) {
+                System.out.println("Delete files: " + file);
+            }
+        } catch (Exception e) {
+            System.out.println("QQQQ");
+            System.out.println(e.getMessage());
+            responseObserver.onNext(WriteBatchResponse.newBuilder()
+                    .setSuccess(false)
+                    .setFailure(e.getMessage())
+                    .build());
+            responseObserver.onCompleted();
+
+            return;
         }
-        for (String file : request.getUpdateFilesList()) {
-            System.out.println("Update files: " + file);
-        }
-        for (String file : request.getDeleteFilesList()) {
-            System.out.println("Delete files: " + file);
-        }
+
         responseObserver.onNext(WriteBatchResponse.newBuilder().setSuccess(true).build());
         responseObserver.onCompleted();
     }
