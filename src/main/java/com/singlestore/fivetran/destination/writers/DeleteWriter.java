@@ -31,13 +31,11 @@ public class DeleteWriter extends Writer {
     @Override
     public void setHeader(List<String> header) {
         Map<String, Column> nameToColumn = new HashMap<>();
-
         for (Column column : table.getColumnsList()) {
             if (column.getPrimaryKey()) {
                 nameToColumn.put(column.getName(), column);
             }
         }
-        List<Column> columns = table.getColumnsList();
 
         for (int i = 0; i < header.size(); i++) {
             String columnName = header.get(i);
