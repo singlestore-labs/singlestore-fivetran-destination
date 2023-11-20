@@ -25,4 +25,14 @@ public class UpdateWriter extends Writer {
     public void write(String file) {
 
     }
+
+    @Override
+    public void commit() {
+
+    }
+
+    @Override
+    public void abort(Exception writerException) throws Exception {
+
+    }
 }

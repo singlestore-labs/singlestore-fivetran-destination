@@ -19,4 +19,14 @@ public class DeleteWriter extends Writer {
     public void writeRow(List<String> row) {
 
     }
+
+    @Override
+    public void commit() {
+
+    }
+
+    @Override
+    public void abort(Exception writerException) throws Exception {
+
+    }
 }

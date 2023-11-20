@@ -239,7 +239,7 @@ public class JDBCUtil {
         }
     }
 
-    static String escapeIdentifier(String ident) {
+    public static String escapeIdentifier(String ident) {
         return String.format("`%s`", ident.replace("`", "``"));
     }
 
