@@ -1,6 +1,7 @@
 package com.singlestore.fivetran.destination.writers;
 
 import com.opencsv.CSVReader;
+import fivetran_sdk.CsvFileParams;
 import fivetran_sdk.Table;
 
 import java.io.File;
@@ -24,11 +25,13 @@ abstract public class Writer {
     Connection conn;
     String database;
     Table table;
+    CsvFileParams params;
 
-    public Writer(Connection conn, String database, Table table) {
+    public Writer(Connection conn, String database, Table table, CsvFileParams params) {
         this.conn = conn;
         this.database = database;
         this.table = table;
+        this.params = params;
     }
 
     abstract public void setHeader(List<String> header) throws SQLException;

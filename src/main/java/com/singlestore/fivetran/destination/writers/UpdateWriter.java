@@ -2,19 +2,17 @@ package com.singlestore.fivetran.destination.writers;
 
 import com.singlestore.fivetran.destination.JDBCUtil;
 import fivetran_sdk.Column;
+import fivetran_sdk.CsvFileParams;
 import fivetran_sdk.Table;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class UpdateWriter extends Writer {
-    public UpdateWriter(Connection conn, String database, Table table) {
-        super(conn, database ,table);
+    public UpdateWriter(Connection conn, String database, Table table, CsvFileParams params) {
+        super(conn, database ,table, params);
     }
 
     List<Column> columns;
@@ -46,7 +44,7 @@ public class UpdateWriter extends Writer {
         for (int i = 0; i < row.size(); i++) {
             Column c = columns.get(i);
             // TODO: handle no update
-            if (true) {
+            if (!row.get(i).equals(params.getUnmodifiedString())) {
                 if (firstUpdateColumn) {
                     updateClause.append(String.format("%s = ?", JDBCUtil.escapeIdentifier(c.getName())));
                     firstUpdateColumn = false;
@@ -67,35 +65,85 @@ public class UpdateWriter extends Writer {
 
         String query = updateClause.toString() + whereClause;
 
+        int paramIndex = 0;
         try (PreparedStatement stmt = conn.prepareStatement(query.toString())) {
             for (int i = 0; i < row.size(); i++) {
                 String value = row.get(i);
-                switch (columns.get(i).getType()) {
-                    case BOOLEAN:
-                        stmt.setBoolean(i + 1, Boolean.parseBoolean(value));
-                    case SHORT:
-                        stmt.setShort(i + 1, Short.parseShort(value));
-                    case INT:
-                        stmt.setInt(i + 1, Integer.parseInt(value));
-                    case LONG:
-                        stmt.setLong(i + 1, Long.parseLong(value));
-                    case FLOAT:
-                        stmt.setFloat(i + 1, Float.parseFloat(value));
-                    case DOUBLE:
-                        stmt.setDouble(i + 1, Double.parseDouble(value));
-                    case BINARY:
-                        stmt.setBytes(i + 1, value.getBytes());
+                if (value.equals(params.getUnmodifiedString())) {
+                    continue;
+                }
 
-                    case DECIMAL:
-                    case NAIVE_DATE:
-                    case NAIVE_DATETIME:
-                    case UTC_DATETIME:
-                    case XML:
-                    case STRING:
-                    case JSON:
-                    case UNSPECIFIED:
-                    default:
-                        stmt.setString(i + 1, value);
+                paramIndex++;
+                if (value.equals(params.getNullString())) {
+                    stmt.setNull(paramIndex, Types.NULL);
+                } else {
+                    switch (columns.get(i).getType()) {
+                        case BOOLEAN:
+                            stmt.setBoolean(paramIndex, Boolean.parseBoolean(value));
+                        case SHORT:
+                            stmt.setShort(paramIndex, Short.parseShort(value));
+                        case INT:
+                            stmt.setInt(paramIndex, Integer.parseInt(value));
+                        case LONG:
+                            stmt.setLong(paramIndex, Long.parseLong(value));
+                        case FLOAT:
+                            stmt.setFloat(paramIndex, Float.parseFloat(value));
+                        case DOUBLE:
+                            stmt.setDouble(paramIndex, Double.parseDouble(value));
+                        case BINARY:
+                            stmt.setBytes(paramIndex, value.getBytes());
+
+                        case DECIMAL:
+                        case NAIVE_DATE:
+                        case NAIVE_DATETIME:
+                        case UTC_DATETIME:
+                        case XML:
+                        case STRING:
+                        case JSON:
+                        case UNSPECIFIED:
+                        default:
+                            stmt.setString(i + 1, value);
+                    }
+                }
+            }
+
+            for (int i = 0; i < row.size(); i++) {
+                String value = row.get(i);
+                if (!columns.get(i).getPrimaryKey()) {
+                    continue;
+                }
+
+                paramIndex++;
+                if (value.equals(params.getNullString())) {
+                    stmt.setNull(paramIndex, Types.NULL);
+                } else {
+                    switch (columns.get(i).getType()) {
+                        case BOOLEAN:
+                            stmt.setBoolean(paramIndex, Boolean.parseBoolean(value));
+                        case SHORT:
+                            stmt.setShort(paramIndex, Short.parseShort(value));
+                        case INT:
+                            stmt.setInt(paramIndex, Integer.parseInt(value));
+                        case LONG:
+                            stmt.setLong(paramIndex, Long.parseLong(value));
+                        case FLOAT:
+                            stmt.setFloat(paramIndex, Float.parseFloat(value));
+                        case DOUBLE:
+                            stmt.setDouble(paramIndex, Double.parseDouble(value));
+                        case BINARY:
+                            stmt.setBytes(paramIndex, value.getBytes());
+
+                        case DECIMAL:
+                        case NAIVE_DATE:
+                        case NAIVE_DATETIME:
+                        case UTC_DATETIME:
+                        case XML:
+                        case STRING:
+                        case JSON:
+                        case UNSPECIFIED:
+                        default:
+                            stmt.setString(i + 1, value);
+                    }
                 }
             }
 

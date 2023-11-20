@@ -1,6 +1,7 @@
 package com.singlestore.fivetran.destination.writers;
 
 import com.singlestore.fivetran.destination.JDBCUtil;
+import fivetran_sdk.CsvFileParams;
 import fivetran_sdk.Table;
 
 import java.io.IOException;
@@ -9,6 +10,7 @@ import java.io.PipedOutputStream;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -21,20 +23,20 @@ public class LoadDataWriter extends Writer {
     final SQLException[] queryException = new SQLException[1];
     Statement stmt;
 
-    public LoadDataWriter(Connection conn, String database, Table table) throws IOException {
-        super(conn, database, table);
+    public LoadDataWriter(Connection conn, String database, Table table, CsvFileParams params) throws IOException {
+        super(conn, database, table, params);
     }
 
     @Override
     public void setHeader(List<String> header) throws SQLException {
         // TODO: add compression
-        // TODO: handle NULL
-        String query = String.format("LOAD DATA LOCAL INFILE '###.tsv' REPLACE INTO TABLE %s.%s (%s)",
+        String query = String.format("LOAD DATA LOCAL INFILE '###.tsv' REPLACE INTO TABLE %s.%s (%s) NULL DEFINED BY %s",
                 JDBCUtil.escapeIdentifier(database),
                 JDBCUtil.escapeIdentifier(table.getName()),
                 header.stream()
                         .map(JDBCUtil::escapeIdentifier)
-                        .collect(Collectors.joining(", "))
+                        .collect(Collectors.joining(", ")),
+                params.getNullString()
                 );
 
         stmt = conn.createStatement();
@@ -59,6 +61,7 @@ public class LoadDataWriter extends Writer {
         try {
             for (int i = 0; i < row.size(); i++) {
                 String value = row.get(i);
+
                 if (value.indexOf('\\') != -1) {
                     value = value.replace("\\", "\\\\");
                 }

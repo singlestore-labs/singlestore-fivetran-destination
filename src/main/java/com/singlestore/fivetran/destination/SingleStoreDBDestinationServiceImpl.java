@@ -181,21 +181,22 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
         try (
                 Connection conn = JDBCUtil.createConnection(conf);
         ) {
-            LoadDataWriter w = new LoadDataWriter(conn, request.getSchemaName(), request.getTable());
+            LoadDataWriter w = new LoadDataWriter(conn, request.getSchemaName(), request.getTable(), request.getCsv());
             for (String file : request.getReplaceFilesList()) {
                 System.out.println("Update files: " + file);
                 w.write(file);
             }
             w.commit();
 
-            UpdateWriter u = new UpdateWriter(conn, request.getSchemaName(), request.getTable());
+            UpdateWriter u = new UpdateWriter(conn, request.getSchemaName(), request.getTable(), request.getCsv());
             for (String file : request.getUpdateFilesList()) {
                 System.out.println("Update files: " + file);
                 u.write(file);
             }
             u.commit();
 
-            DeleteWriter d = new DeleteWriter(conn, request.getSchemaName(), request.getTable());
+
+            DeleteWriter d = new DeleteWriter(conn, request.getSchemaName(), request.getTable(), request.getCsv());
             for (String file : request.getDeleteFilesList()) {
                 System.out.println("Delete files: " + file);
                 d.write(file);
