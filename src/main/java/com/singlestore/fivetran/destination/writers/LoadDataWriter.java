@@ -6,6 +6,7 @@ import fivetran_sdk.Table;
 import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
@@ -18,9 +19,10 @@ public class LoadDataWriter extends Writer {
     PipedInputStream inputStream = new PipedInputStream(outputStream, BUFFER_SIZE);
     Thread t;
     final SQLException[] queryException = new SQLException[1];
+    Statement stmt;
 
-    public LoadDataWriter(Statement stmt, String database, Table table) throws IOException {
-        super(stmt, database, table);
+    public LoadDataWriter(Connection conn, String database, Table table) throws IOException {
+        super(conn, database, table);
     }
 
     @Override
@@ -35,6 +37,7 @@ public class LoadDataWriter extends Writer {
                         .collect(Collectors.joining(", "))
                 );
 
+        stmt = conn.createStatement();
         ((com.singlestore.jdbc.Statement)stmt).setNextLocalInfileInputStream(inputStream);
 
         t = new Thread(new Runnable() {
@@ -42,6 +45,7 @@ public class LoadDataWriter extends Writer {
             public void run() {
                 try {
                     stmt.executeUpdate(query);
+                    stmt.close();
                 } catch (SQLException e) {
                     queryException[0] = e;
                 }
@@ -51,37 +55,44 @@ public class LoadDataWriter extends Writer {
     }
 
     @Override
-    public void writeRow(List<String> row) throws IOException {
-        for (int i = 0; i < row.size(); i++) {
-            String value = row.get(i);
-            if (value.indexOf('\\') != -1) {
-                value = value.replace("\\", "\\\\");
-            }
-            if (value.indexOf('\n') != -1) {
-                value = value.replace("\n", "\\n");
-            }
-            if (value.indexOf('\t') != -1) {
-                value = value.replace("\t", "\\t");
-            }
+    public void writeRow(List<String> row) throws Exception {
+        try {
+            for (int i = 0; i < row.size(); i++) {
+                String value = row.get(i);
+                if (value.indexOf('\\') != -1) {
+                    value = value.replace("\\", "\\\\");
+                }
+                if (value.indexOf('\n') != -1) {
+                    value = value.replace("\n", "\\n");
+                }
+                if (value.indexOf('\t') != -1) {
+                    value = value.replace("\t", "\\t");
+                }
 
-            outputStream.write(value.getBytes());
+                outputStream.write(value.getBytes());
 
-            if (i != row.size() - 1) {
-                outputStream.write('\t');
-            } else {
-                outputStream.write('\n');
+                if (i != row.size() - 1) {
+                    outputStream.write('\t');
+                } else {
+                    outputStream.write('\n');
+                }
             }
+        } catch (Exception e) {
+            abort(e);
         }
     }
 
     @Override
-    public void commit() throws InterruptedException, IOException {
+    public void commit() throws InterruptedException, IOException, SQLException {
         outputStream.close();
         t.join();
+
+        if (queryException[0] != null) {
+            throw queryException[0];
+        }
     }
 
-    @Override
-    public void abort(Exception writerException) throws Exception {
+    private void abort(Exception writerException) throws Exception {
         try {
             outputStream.close();
         } catch (Exception ignored) {}
@@ -91,7 +102,7 @@ public class LoadDataWriter extends Writer {
         } catch (Exception ignored) {}
 
         try {
-            t.join();
+            t.interrupt();
         } catch (Exception ignored) {}
 
         if (writerException instanceof IOException && writerException.getMessage().contains("Pipe closed")) {

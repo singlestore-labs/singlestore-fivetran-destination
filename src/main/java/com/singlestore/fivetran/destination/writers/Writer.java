@@ -21,18 +21,18 @@ import java.util.stream.Collectors;
 
 abstract public class Writer {
 
-    Statement stmt;
+    Connection conn;
     String database;
     Table table;
 
-    public Writer(Statement stmt, String database, Table table) {
-        this.stmt = stmt;
+    public Writer(Connection conn, String database, Table table) {
+        this.conn = conn;
         this.database = database;
         this.table = table;
     }
 
     abstract public void setHeader(List<String> header) throws SQLException;
-    abstract public void writeRow(List<String> row) throws IOException;
+    abstract public void writeRow(List<String> row) throws Exception;
 
     public void write(String file) throws Exception {
         file = file.replace("/data", "/home/amakarovych-ua/Projects/singlestoredb-fivetran-destination/data-folder");
@@ -60,7 +60,5 @@ abstract public class Writer {
         }
     }
 
-    abstract public void commit() throws InterruptedException, IOException;
-
-    public abstract void abort(Exception writerException) throws Exception;
+    abstract public void commit() throws InterruptedException, IOException, SQLException;
 }

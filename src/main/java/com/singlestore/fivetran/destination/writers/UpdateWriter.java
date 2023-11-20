@@ -7,8 +7,8 @@ import java.sql.Statement;
 import java.util.List;
 
 public class UpdateWriter extends Writer {
-    UpdateWriter(Statement stmt, String database, Table table) {
-        super(stmt, database ,table);
+    UpdateWriter(Connection conn, String database, Table table) {
+        super(conn, database ,table);
     }
 
     @Override
@@ -28,11 +28,6 @@ public class UpdateWriter extends Writer {
 
     @Override
     public void commit() {
-
-    }
-
-    @Override
-    public void abort(Exception writerException) throws Exception {
 
     }
 }
