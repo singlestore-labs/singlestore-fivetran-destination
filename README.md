@@ -13,4 +13,4 @@
 ```
 > java -jar build/libs/singlestoredb-fivetran-destination.jar 
 ```
-3. To run the tester follow instructions from [here](https://github.com/fivetran/fivetran_sdk/blob/main/tools/destination-tester/README.md)
+3. To run the tester follow instructions from [here](https://github.com/fivetran/fivetran_sdk/blob/main/tools/destination-tester/README.md). You can use `./data-folder` as `<local-data-folder>`.
