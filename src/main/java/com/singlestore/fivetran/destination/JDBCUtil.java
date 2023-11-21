@@ -2,10 +2,7 @@ package com.singlestore.fivetran.destination;
 
 import fivetran_sdk.*;
 
-import java.sql.Connection;
-import java.sql.DatabaseMetaData;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
+import java.sql.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -14,25 +11,22 @@ public class JDBCUtil {
         Properties connectionProps = new Properties();
         connectionProps.put("user", conf.user());
         connectionProps.put("password", conf.password());
+        connectionProps.put("allowLocalInfile", "true");
 
         String url = String.format("jdbc:singlestore://%s:%d", conf.host(), conf.port());
         return DriverManager.getConnection(url, connectionProps);
     }
 
-    static Table getTable(SingleStoreDBConfiguration conf, String database, String table) throws Exception {
-        System.out.println("GETTING TABLE: " + database + "|" + table);
+    static Table getTable(SingleStoreDBConfiguration conf, String database, String table) throws SQLException, TableNotExistException {
         try (Connection conn = JDBCUtil.createConnection(conf)) {
-            DatabaseMetaData metadata=conn.getMetaData();
-            System.out.println("AAAAAA1");
+            DatabaseMetaData metadata = conn.getMetaData();
 
             try (ResultSet tables = metadata.getTables(database, null, table, null)) {
                 if (!tables.next()) {
-                    System.out.println("AAAAAA");
                     throw new TableNotExistException();
                 }
-                // TODO: handle case when several tables are returned
+                // TODO: PLAT-6892 print warning if several tables returned
             }
-            System.out.println("AAAAAA2");
 
             Set<String> primaryKeys = new HashSet<>();
             try (ResultSet primaryKeysRS = metadata.getPrimaryKeys(database, null, table)) {
@@ -41,7 +35,6 @@ public class JDBCUtil {
                 }
             }
 
-            System.out.println("AAAAAA3");
             List<Column> columns = new ArrayList<>();
             try (ResultSet columnsRS = metadata.getColumns(database, null, table, null)) {
                 while(columnsRS.next()) {
@@ -49,12 +42,11 @@ public class JDBCUtil {
                             .setName(columnsRS.getString("COLUMN_NAME"))
                             .setType(JDBCUtil.mapDataTypes(columnsRS.getInt("DATA_TYPE"), columnsRS.getString("TYPE_NAME")))
                             .setPrimaryKey(primaryKeys.contains(columnsRS.getString("COLUMN_NAME")))
-                            // TODO: get scale and precision
+                            // TODO: PLAT-6894 get scale and precision
                             .build());
                 }
             }
 
-            System.out.println("AAAAAA4");
             return Table.newBuilder()
                     .setName(table)
                     .addAllColumns(columns)
@@ -64,7 +56,6 @@ public class JDBCUtil {
 
     static DataType mapDataTypes(Integer dataType, String typeName) {
         switch (typeName) {
-            // TODO: handle precision and scale
             case "TINYINT":
                 return DataType.BOOLEAN;
             case "SMALLINT":
@@ -78,10 +69,9 @@ public class JDBCUtil {
                 return DataType.FLOAT;
             case "DOUBLE":
                 return DataType.DOUBLE;
-            // TODO: handle precision and scale
+            // TODO: PLAT-6894 handle precision and scale
             case "DECIMAL":
                 return DataType.DECIMAL;
-            // TODO: handle time zone
             case "DATE":
             case "YEAR":
                 return DataType.NAIVE_DATE;
@@ -113,7 +103,7 @@ public class JDBCUtil {
         }
     }
 
-    static String generateAlterTableQuery(AlterTableRequest request) throws Exception {
+    static String generateAlterTableQuery(AlterTableRequest request) throws SQLException, TableNotExistException {
         SingleStoreDBConfiguration conf = new SingleStoreDBConfiguration(request.getConfigurationMap());
 
         String database = request.getSchemaName();
@@ -121,8 +111,6 @@ public class JDBCUtil {
 
         Table oldTable = getTable(conf, database, table);
         Table newTable = request.getTable();
-        oldTable.getColumnsList().forEach(column -> System.out.println("Old column " + column.getType()));
-        newTable.getColumnsList().forEach(column -> System.out.println("New column " + column.getType()));
 
         // TODO: throw an exception if PK differs
 
@@ -139,12 +127,12 @@ public class JDBCUtil {
     }
 
     static String generateTruncateTableQuery(TruncateRequest request) {
-        return String.format("TRUNCATE TABLE %s.%s",
-                escapeIdentifier(request.getSchemaName()),
-                escapeIdentifier(request.getTableName())
+        return String.format("TRUNCATE TABLE %s",
+                escapeTable(request.getSchemaName(), request.getTableName())
         );
     }
 
+    // TODO: PLAT-6895 generate several queries for columnstore tables
     static String generateAlterTableQuery(String database, String table, Set<Column> columnsToDrop, Set<Column> columnsToAdd) {
         if (columnsToDrop.isEmpty() && columnsToAdd.isEmpty()) {
             return null;
@@ -161,9 +149,8 @@ public class JDBCUtil {
                         getColumnDefinition(column))));
 
 
-        return String.format("ALTER TABLE %s.%s %s",
-                escapeIdentifier(database),
-                escapeIdentifier(table),
+        return String.format("ALTER TABLE %s %s",
+                escapeTable(database, table),
                 String.join(", ", operations)
         );
     }
@@ -173,11 +160,9 @@ public class JDBCUtil {
         String table = request.getTable().getName();
         String columnDefinitions = getColumnDefinitions(request.getTable().getColumnsList());
 
-        return String.format("CREATE TABLE %s.%s (%s)",
-                escapeIdentifier(database),
-                escapeIdentifier(table),
-                columnDefinitions
-                );
+        return String.format("CREATE TABLE %s (%s)",
+                escapeTable(database, table),
+                columnDefinitions);
     }
 
     static String getColumnDefinitions(List<Column> columns) {
@@ -200,11 +185,12 @@ public class JDBCUtil {
     }
 
     static String getColumnDefinition(Column col) {
+        // TODO: PLAT-6894 handle scale and precision
         return String.format("%s %s", escapeIdentifier(col.getName()), mapDataTypes(col.getType(), col.getDecimal()));
     }
 
     static String mapDataTypes(DataType type, DecimalParams decimal) {
-        // TODO: handle decimal
+        // TODO: PLAT-6894 handle scale and precision
         switch (type) {
             case BOOLEAN:
                 return "BOOL";
@@ -220,7 +206,6 @@ public class JDBCUtil {
                 return "FLOAT";
             case DOUBLE:
                 return "DOUBLE";
-            // TODO: handle time correctly
             case NAIVE_DATE:
                 return "DATE";
             case NAIVE_DATETIME:
@@ -233,14 +218,53 @@ public class JDBCUtil {
             case UNSPECIFIED:
             case XML:
             case STRING:
-                return "TEXT";
             default:
                 return "TEXT";
         }
     }
 
+    public static void setParameter(PreparedStatement stmt, Integer id, DataType type, String value, String nullStr) throws SQLException {
+        if (value.equals(nullStr)) {
+            stmt.setNull(id, Types.NULL);
+        } else {
+            switch (type) {
+                case BOOLEAN:
+                    stmt.setBoolean(id, Boolean.parseBoolean(value));
+                case SHORT:
+                    stmt.setShort(id, Short.parseShort(value));
+                case INT:
+                    stmt.setInt(id, Integer.parseInt(value));
+                case LONG:
+                    stmt.setLong(id, Long.parseLong(value));
+                case FLOAT:
+                    stmt.setFloat(id, Float.parseFloat(value));
+                case DOUBLE:
+                    stmt.setDouble(id, Double.parseDouble(value));
+                case BINARY:
+                    stmt.setBytes(id, value.getBytes());
+
+                case DECIMAL:
+                case NAIVE_DATE:
+                case NAIVE_DATETIME:
+                case UTC_DATETIME:
+                case XML:
+                case STRING:
+                case JSON:
+                case UNSPECIFIED:
+                default:
+                    stmt.setString(id, value);
+            }
+        }
+    }
+
     public static String escapeIdentifier(String ident) {
         return String.format("`%s`", ident.replace("`", "``"));
+    }
+    public static String escapeString(String ident) {
+        return String.format("'%s'", ident.replace("'", "''"));
+    }
+    public static String escapeTable(String database, String table) {
+        return escapeIdentifier(database) + "." + escapeIdentifier(table);
     }
 
     static class TableNotExistException extends Exception {

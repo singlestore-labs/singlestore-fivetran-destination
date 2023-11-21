@@ -10,10 +10,10 @@ import java.io.PipedOutputStream;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.sql.Types;
 import java.util.List;
 import java.util.stream.Collectors;
 
+// TODO: PLAT-6897 allow to configure batch size in writers
 public class LoadDataWriter extends Writer {
 
     final int BUFFER_SIZE = 524288;
@@ -29,28 +29,24 @@ public class LoadDataWriter extends Writer {
 
     @Override
     public void setHeader(List<String> header) throws SQLException {
-        // TODO: add compression
-        String query = String.format("LOAD DATA LOCAL INFILE '###.tsv' REPLACE INTO TABLE %s.%s (%s) NULL DEFINED BY %s",
-                JDBCUtil.escapeIdentifier(database),
-                JDBCUtil.escapeIdentifier(table.getName()),
+        // TODO: PLAT-6898 add compression
+        String query = String.format("LOAD DATA LOCAL INFILE '###.tsv' REPLACE INTO TABLE %s (%s) NULL DEFINED BY %s",
+                JDBCUtil.escapeTable(database, table.getName()),
                 header.stream()
                         .map(JDBCUtil::escapeIdentifier)
                         .collect(Collectors.joining(", ")),
-                params.getNullString()
+                JDBCUtil.escapeString(params.getNullString())
                 );
 
         stmt = conn.createStatement();
         ((com.singlestore.jdbc.Statement)stmt).setNextLocalInfileInputStream(inputStream);
 
-        t = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    stmt.executeUpdate(query);
-                    stmt.close();
-                } catch (SQLException e) {
-                    queryException[0] = e;
-                }
+        t = new Thread(() -> {
+            try {
+                stmt.executeUpdate(query);
+                stmt.close();
+            } catch (SQLException e) {
+                queryException[0] = e;
             }
         });
         t.start();
@@ -109,7 +105,7 @@ public class LoadDataWriter extends Writer {
         } catch (Exception ignored) {}
 
         if (writerException instanceof IOException && writerException.getMessage().contains("Pipe closed")) {
-            // The actual exception occured in the query thread
+            // The actual exception occurred in the query thread
             throw queryException[0];
         } else {
             throw writerException;

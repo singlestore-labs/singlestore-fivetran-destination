@@ -13,7 +13,7 @@ public class SingleStoreDBConfiguration {
         this.port = Integer.valueOf(conf.get("port"));
         this.user = conf.get("user");
         this.password = conf.get("password");
-        // TODO: add other options
+        // TODO: PLAT-6891 add other configurations
     }
 
     public String host() {

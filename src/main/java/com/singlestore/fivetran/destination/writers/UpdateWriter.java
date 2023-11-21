@@ -6,16 +6,18 @@ import fivetran_sdk.CsvFileParams;
 import fivetran_sdk.Table;
 
 import java.sql.*;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+// TODO: PLAT-6897 allow to configure batch size in writers
 public class UpdateWriter extends Writer {
     public UpdateWriter(Connection conn, String database, Table table, CsvFileParams params) {
         super(conn, database ,table, params);
     }
 
-    List<Column> columns;
+    List<Column> columns = new ArrayList<>();
 
     @Override
     public void setHeader(List<String> header) {
@@ -32,9 +34,8 @@ public class UpdateWriter extends Writer {
     @Override
     public void writeRow(List<String> row) throws SQLException {
         StringBuilder updateClause = new StringBuilder(
-                String.format("UPDATE %s.%s SET ",
-                        JDBCUtil.escapeIdentifier(database),
-                        JDBCUtil.escapeIdentifier(table.getName()))
+                String.format("UPDATE %s SET ",
+                        JDBCUtil.escapeTable(database, table.getName()))
         );
         StringBuilder whereClause = new StringBuilder("WHERE ");
 
@@ -74,37 +75,7 @@ public class UpdateWriter extends Writer {
                 }
 
                 paramIndex++;
-                if (value.equals(params.getNullString())) {
-                    stmt.setNull(paramIndex, Types.NULL);
-                } else {
-                    switch (columns.get(i).getType()) {
-                        case BOOLEAN:
-                            stmt.setBoolean(paramIndex, Boolean.parseBoolean(value));
-                        case SHORT:
-                            stmt.setShort(paramIndex, Short.parseShort(value));
-                        case INT:
-                            stmt.setInt(paramIndex, Integer.parseInt(value));
-                        case LONG:
-                            stmt.setLong(paramIndex, Long.parseLong(value));
-                        case FLOAT:
-                            stmt.setFloat(paramIndex, Float.parseFloat(value));
-                        case DOUBLE:
-                            stmt.setDouble(paramIndex, Double.parseDouble(value));
-                        case BINARY:
-                            stmt.setBytes(paramIndex, value.getBytes());
-
-                        case DECIMAL:
-                        case NAIVE_DATE:
-                        case NAIVE_DATETIME:
-                        case UTC_DATETIME:
-                        case XML:
-                        case STRING:
-                        case JSON:
-                        case UNSPECIFIED:
-                        default:
-                            stmt.setString(i + 1, value);
-                    }
-                }
+                JDBCUtil.setParameter(stmt, paramIndex, columns.get(i).getType(), value, params.getNullString());
             }
 
             for (int i = 0; i < row.size(); i++) {
@@ -114,37 +85,7 @@ public class UpdateWriter extends Writer {
                 }
 
                 paramIndex++;
-                if (value.equals(params.getNullString())) {
-                    stmt.setNull(paramIndex, Types.NULL);
-                } else {
-                    switch (columns.get(i).getType()) {
-                        case BOOLEAN:
-                            stmt.setBoolean(paramIndex, Boolean.parseBoolean(value));
-                        case SHORT:
-                            stmt.setShort(paramIndex, Short.parseShort(value));
-                        case INT:
-                            stmt.setInt(paramIndex, Integer.parseInt(value));
-                        case LONG:
-                            stmt.setLong(paramIndex, Long.parseLong(value));
-                        case FLOAT:
-                            stmt.setFloat(paramIndex, Float.parseFloat(value));
-                        case DOUBLE:
-                            stmt.setDouble(paramIndex, Double.parseDouble(value));
-                        case BINARY:
-                            stmt.setBytes(paramIndex, value.getBytes());
-
-                        case DECIMAL:
-                        case NAIVE_DATE:
-                        case NAIVE_DATETIME:
-                        case UTC_DATETIME:
-                        case XML:
-                        case STRING:
-                        case JSON:
-                        case UNSPECIFIED:
-                        default:
-                            stmt.setString(i + 1, value);
-                    }
-                }
+                JDBCUtil.setParameter(stmt, paramIndex, columns.get(i).getType(), value, params.getNullString());
             }
 
             stmt.execute();

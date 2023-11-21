@@ -12,6 +12,7 @@ import java.util.*;
 public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.DestinationImplBase {
     @Override
     public void configurationForm(ConfigurationFormRequest request, StreamObserver<ConfigurationFormResponse> responseObserver) {
+        // TODO: PLAT-6891 add more configurations
         responseObserver.onNext(
                 ConfigurationFormResponse.newBuilder()
                         .setSchemaSelectionSupported(true)
@@ -36,6 +37,7 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
     @Override
     public void test(TestRequest request, StreamObserver<TestResponse> responseObserver) {
         String testName = request.getName();
+        // TODO: PLAT-6892 make consistent logging
         System.out.println("test name: " + testName);
 
         if (testName.equals("connect")) {
@@ -57,9 +59,9 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
 
     @Override
     public void describeTable(DescribeTableRequest request, StreamObserver<DescribeTableResponse> responseObserver) {
-        System.out.println("DESCRIBE TABLE: " + request.getSchemaName() + "|" + request.getTableName());
+        // TODO: PLAT-6892 make consistent logging
+        System.out.println("[DescribeTable]: " + request.getSchemaName() + "|" + request.getTableName());
         SingleStoreDBConfiguration conf = new SingleStoreDBConfiguration(request.getConfigurationMap());
-
         String database = request.getSchemaName();
         String table = request.getTableName();
 
@@ -91,7 +93,8 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
 
     @Override
     public void createTable(CreateTableRequest request, StreamObserver<CreateTableResponse> responseObserver) {
-        System.out.println("CREATE TABLE: " + request.getSchemaName() + "|" + request.getTable().getName());
+        // TODO: PLAT-6892 make consistent logging
+        System.out.println("[CreateTable]: " + request.getSchemaName() + "|" + request.getTable().getName());
         SingleStoreDBConfiguration conf = new SingleStoreDBConfiguration(request.getConfigurationMap());
 
         String query = JDBCUtil.generateCreateTableQuery(request);
@@ -100,28 +103,22 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
                 Statement stmt = conn.createStatement()
         ) {
             stmt.execute(query);
+
+            responseObserver.onNext(CreateTableResponse.newBuilder().setSuccess(true).build());
+            responseObserver.onCompleted();
         } catch (SQLException e) {
             responseObserver.onNext(CreateTableResponse.newBuilder()
                     .setSuccess(false)
                     .setFailure(e.getMessage())
                     .build());
             responseObserver.onCompleted();
-
-            return;
         }
-
-        responseObserver.onNext(CreateTableResponse.newBuilder().setSuccess(true).build());
-        responseObserver.onCompleted();
     }
 
     @Override
     public void alterTable(AlterTableRequest request, StreamObserver<AlterTableResponse> responseObserver) {
-        System.out.println("ALTER TABLE: " + request.getSchemaName() + "|" + request.getTable().getName());
-        for (String keys : request.getConfigurationMap().keySet())
-        {
-            System.out.println("MAP KEY: " + keys);
-        }
-
+        // TODO: PLAT-6892 make consistent logging
+        System.out.println("[AlterTable]: " + request.getSchemaName() + "|" + request.getTable().getName());
         SingleStoreDBConfiguration conf = new SingleStoreDBConfiguration(request.getConfigurationMap());
 
         try (
@@ -129,27 +126,26 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
                 Statement stmt = conn.createStatement()
         ) {
             String query = JDBCUtil.generateAlterTableQuery(request);
+            // query is null when table is not changed
             if (query != null) {
-                System.out.println("ALTER TABLE QUERY: " + query);
                 stmt.execute(query);
             }
-        } catch (Exception e) {
+
+            responseObserver.onNext(AlterTableResponse.newBuilder().setSuccess(true).build());
+            responseObserver.onCompleted();
+        } catch (SQLException | JDBCUtil.TableNotExistException e) {
             responseObserver.onNext(AlterTableResponse.newBuilder()
                     .setSuccess(false)
                     .setFailure(e.getMessage())
                     .build());
             responseObserver.onCompleted();
-
-            return;
         }
-
-        responseObserver.onNext(AlterTableResponse.newBuilder().setSuccess(true).build());
-        responseObserver.onCompleted();
     }
 
     @Override
     public void truncate(TruncateRequest request, StreamObserver<TruncateResponse> responseObserver) {
-        System.out.println("TRUNCATE TABLE: " + request.getSchemaName() + "|" + request.getTableName());
+        // TODO: PLAT-6892 make consistent logging
+        System.out.println("[Truncate]: " + request.getSchemaName() + "|" + request.getTableName());
         SingleStoreDBConfiguration conf = new SingleStoreDBConfiguration(request.getConfigurationMap());
 
         try (
@@ -158,24 +154,22 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
         ) {
             String query = JDBCUtil.generateTruncateTableQuery(request);
             stmt.execute(query);
-        } catch (Exception e) {
+
+            responseObserver.onNext(TruncateResponse.newBuilder().setSuccess(true).build());
+            responseObserver.onCompleted();
+        } catch (SQLException e) {
             responseObserver.onNext(TruncateResponse.newBuilder()
                     .setSuccess(false)
                     .setFailure(e.getMessage())
                     .build());
             responseObserver.onCompleted();
-
-            return;
         }
-
-        responseObserver.onNext(TruncateResponse.newBuilder().setSuccess(true).build());
-        responseObserver.onCompleted();
     }
 
     @Override
     public void writeBatch(WriteBatchRequest request, StreamObserver<WriteBatchResponse> responseObserver) {
+        // TODO: PLAT-6892 make consistent logging
         System.out.println("[WriteBatch]: " + request.getSchemaName() + " | " + request.getTable().getName());
-
         SingleStoreDBConfiguration conf = new SingleStoreDBConfiguration(request.getConfigurationMap());
 
         try (
@@ -183,14 +177,14 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
         ) {
             LoadDataWriter w = new LoadDataWriter(conn, request.getSchemaName(), request.getTable(), request.getCsv());
             for (String file : request.getReplaceFilesList()) {
-                System.out.println("Update files: " + file);
+                System.out.println("Upsert file: " + file);
                 w.write(file);
             }
             w.commit();
 
             UpdateWriter u = new UpdateWriter(conn, request.getSchemaName(), request.getTable(), request.getCsv());
             for (String file : request.getUpdateFilesList()) {
-                System.out.println("Update files: " + file);
+                System.out.println("Update file: " + file);
                 u.write(file);
             }
             u.commit();
@@ -198,23 +192,19 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
 
             DeleteWriter d = new DeleteWriter(conn, request.getSchemaName(), request.getTable(), request.getCsv());
             for (String file : request.getDeleteFilesList()) {
-                System.out.println("Delete files: " + file);
+                System.out.println("Delete file: " + file);
                 d.write(file);
             }
             d.commit();
+
+            responseObserver.onNext(WriteBatchResponse.newBuilder().setSuccess(true).build());
+            responseObserver.onCompleted();
         } catch (Exception e) {
-            System.out.println("QQQQ");
-            System.out.println(e.getMessage());
             responseObserver.onNext(WriteBatchResponse.newBuilder()
                     .setSuccess(false)
                     .setFailure(e.getMessage())
                     .build());
             responseObserver.onCompleted();
-
-            return;
         }
-
-        responseObserver.onNext(WriteBatchResponse.newBuilder().setSuccess(true).build());
-        responseObserver.onCompleted();
     }
 }

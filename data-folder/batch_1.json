@@ -2,7 +2,7 @@
     "create_table" : {
         "transaction": {
             "columns": {
-                "id": "INTEGER",
+                "id": "INT",
                 "amount" : "DOUBLE",
                 "desc": "STRING"
             },
@@ -10,7 +10,7 @@
         },
         "campaign": {
             "columns": {
-                "id": "INTEGER",
+                "id": "INT",
                 "name": "STRING"
             },
             "primary_key": ["id"]
@@ -19,7 +19,7 @@
     "alter_table" : {
         "transaction": {
             "columns": {
-                "id": "INTEGER",
+                "id": "INT",
                 "amount" : "DOUBLE",
                 "desc": "STRING"
             },

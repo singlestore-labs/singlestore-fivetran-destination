@@ -3,11 +3,10 @@ package com.singlestore.fivetran.destination.writers;
 import com.singlestore.fivetran.destination.JDBCUtil;
 import fivetran_sdk.Column;
 import fivetran_sdk.CsvFileParams;
-import fivetran_sdk.DataType;
 import fivetran_sdk.Table;
 
-import java.math.BigDecimal;
 import java.sql.*;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -15,12 +14,12 @@ import java.util.stream.Collectors;
 
 public class DeleteWriter extends Writer {
 
-    // TODO: make batch size configurable
+    // TODO: PLAT-6897 make batch size configurable
     final int BATCH_SIZE = 10000;
 
-    List<Integer> pkIds;
-    List<Column> pkColumns;
-    List<List<String>> batch;
+    List<Integer> pkIds = new ArrayList<>();
+    List<Column> pkColumns = new ArrayList<>();
+    List<List<String>> batch = new ArrayList<>();
 
     public DeleteWriter(Connection conn, String database, Table table, CsvFileParams params) {
         super(conn, database, table, params);
@@ -57,9 +56,8 @@ public class DeleteWriter extends Writer {
             return;
         }
 
-        StringBuilder query = new StringBuilder(String.format("DELETE FROM %s.%s WHERE ",
-                JDBCUtil.escapeIdentifier(database),
-                JDBCUtil.escapeIdentifier(table.getName())));
+        StringBuilder query = new StringBuilder(String.format("DELETE FROM %s WHERE ",
+                JDBCUtil.escapeTable(database, table.getName())));
 
         String condition = pkColumns.stream()
                 .map(column -> String.format("%s = ?",
@@ -83,37 +81,7 @@ public class DeleteWriter extends Writer {
                 for (int j = 0; j < pkIds.size(); j++) {
                     int paramIndex = i*pkIds.size() + j + 1;
                     String value = row.get(pkIds.get(j));
-                    if (value.equals(params.getNullString())) {
-                        stmt.setNull(paramIndex, Types.NULL);
-                    } else {
-                        switch (pkColumns.get(j).getType()) {
-                            case BOOLEAN:
-                                stmt.setBoolean(paramIndex, Boolean.parseBoolean(value));
-                            case SHORT:
-                                stmt.setShort(paramIndex, Short.parseShort(value));
-                            case INT:
-                                stmt.setInt(paramIndex, Integer.parseInt(value));
-                            case LONG:
-                                stmt.setLong(paramIndex, Long.parseLong(value));
-                            case FLOAT:
-                                stmt.setFloat(paramIndex, Float.parseFloat(value));
-                            case DOUBLE:
-                                stmt.setDouble(paramIndex, Double.parseDouble(value));
-                            case BINARY:
-                                stmt.setBytes(paramIndex, value.getBytes());
-
-                            case DECIMAL:
-                            case NAIVE_DATE:
-                            case NAIVE_DATETIME:
-                            case UTC_DATETIME:
-                            case XML:
-                            case STRING:
-                            case JSON:
-                            case UNSPECIFIED:
-                            default:
-                                stmt.setString(paramIndex, value);
-                        }
-                    }
+                    JDBCUtil.setParameter(stmt, paramIndex, pkColumns.get(j).getType(), value, params.getNullString());
                 }
             }
 

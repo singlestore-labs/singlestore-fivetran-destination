@@ -4,21 +4,15 @@ import com.opencsv.CSVReader;
 import fivetran_sdk.CsvFileParams;
 import fivetran_sdk.Table;
 
-import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.Reader;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Scanner;
-import java.util.stream.Collectors;
 
 abstract public class Writer {
 
@@ -38,13 +32,12 @@ abstract public class Writer {
     abstract public void writeRow(List<String> row) throws Exception;
 
     public void write(String file) throws Exception {
-        file = file.replace("/data", "/home/amakarovych-ua/Projects/singlestoredb-fivetran-destination/data-folder");
-
+        // TODO: PLAT-6896 decrypt and uncompress files
         try (
                 Reader reader = Files.newBufferedReader(Paths.get(file));
                 CSVReader csvReader = new CSVReader(reader)
         ) {
-            List<String> header = Arrays.asList(csvReader.readNext());
+            List<String> header = new ArrayList<>(Arrays.asList(csvReader.readNext()));
             // delete _fivetran_synced
             header.remove(header.size() - 1);
             // delete _fivetran_deleted
@@ -53,7 +46,7 @@ abstract public class Writer {
 
             String[] tokens;
             while ((tokens = csvReader.readNext()) != null) {
-                List<String> row = Arrays.asList(tokens);
+                List<String> row = new ArrayList<>(Arrays.asList(tokens));
                 // delete _fivetran_synced
                 row.remove(row.size() - 1);
                 // delete _fivetran_deleted
