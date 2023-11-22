@@ -37,6 +37,7 @@ dependencies {
     implementation "com.fasterxml.jackson.core:jackson-core:2.14.1"
     implementation 'com.singlestore:singlestore-jdbc-client:1.2.0'
     implementation 'com.opencsv:opencsv:5.8'
+    implementation 'com.github.luben:zstd-jni:1.5.5-10'
 }
 
 protobuf {
