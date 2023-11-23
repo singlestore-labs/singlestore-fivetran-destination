@@ -93,7 +93,7 @@ abstract public class Writer {
                     return;
                 }
 
-                List<String> header = new ArrayList<>(Arrays.asList(csvReader.readNext()));
+                List<String> header = new ArrayList<>(Arrays.asList(headerString));
                 // delete _fivetran_synced
                 header.remove(header.size() - 1);
                 // delete _fivetran_deleted
