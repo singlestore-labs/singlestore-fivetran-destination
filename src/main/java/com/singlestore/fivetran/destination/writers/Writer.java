@@ -45,26 +45,27 @@ abstract public class Writer {
     abstract public void setHeader(List<String> header) throws SQLException;
     abstract public void writeRow(List<String> row) throws Exception;
 
-    private IvParameterSpec readIV(FileInputStream is) throws IOException {
+    private IvParameterSpec readIV(FileInputStream is, String file) throws Exception {
         byte[] b = new byte[16];
         int bytesRead = 0;
-        while (bytesRead != 16) {
-            int curBytesRead = is.read(b, bytesRead, 16 - bytesRead);
+        while (bytesRead != b.length) {
+            int curBytesRead = is.read(b, bytesRead, b.length - bytesRead);
+            if (curBytesRead == -1) {
+                throw new Exception(String.format("Failed to read initialization vector. File '%s' has only %d bytes",
+                        file,
+                        bytesRead));
+            }
             bytesRead += curBytesRead;
         }
 
         return new IvParameterSpec(b);
     }
 
-    private InputStream decodeAES(FileInputStream is, byte[] secretKeyBytes)
-            throws NoSuchPaddingException,
-            NoSuchAlgorithmException,
-            IOException,
-            InvalidAlgorithmParameterException,
-            InvalidKeyException {
+    private InputStream decodeAES(FileInputStream is, byte[] secretKeyBytes, String file)
+            throws Exception {
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 
-        IvParameterSpec iv = readIV(is);
+        IvParameterSpec iv = readIV(is, file);
         SecretKey secretKey = new SecretKeySpec(secretKeyBytes, "AES");
         cipher.init(Cipher.DECRYPT_MODE, secretKey, iv);
 
@@ -73,24 +74,25 @@ abstract public class Writer {
 
     public void write(String file) throws Exception {
         try (FileInputStream is = new FileInputStream(file)) {
-            InputStream decoded;
+            InputStream decoded = is;
             if (params.getEncryption() == Encryption.AES) {
-                // TODO: change this when tester is fixed
-                decoded = decodeAES(is, secretKeys.get(file.replace("./data-folder", "/data")).toByteArray());
-            } else {
-                decoded = is;
+                decoded = decodeAES(is, secretKeys.get(file).toByteArray(), file);
             }
 
-            InputStream uncompressed;
+            InputStream uncompressed = decoded;
             if (params.getCompression() == Compression.ZSTD) {
                 uncompressed = new ZstdInputStream(decoded);
             } else if (params.getCompression() == Compression.GZIP) {
                 uncompressed = new GZIPInputStream(decoded);
-            } else {
-                uncompressed = decoded;
             }
 
             try (CSVReader csvReader = new CSVReader(new BufferedReader(new InputStreamReader(uncompressed)))) {
+                String[] headerString = csvReader.readNext();
+                if (headerString == null) {
+                    // finish if file is empty
+                    return;
+                }
+
                 List<String> header = new ArrayList<>(Arrays.asList(csvReader.readNext()));
                 // delete _fivetran_synced
                 header.remove(header.size() - 1);
