@@ -32,6 +32,9 @@ public class SingleStoreDBDestination {
         } catch (NumberFormatException e) {
             // TODO: PLAT-6892 make consistent logging
             System.out.printf("Failed to parse --port option: %s%n", e.getMessage());
+            formatter.printHelp("singlestoredb-fivetran-destination", options);
+
+            System.exit(1);
         }
 
         // TODO: PLAT-6892 make consistent logging
