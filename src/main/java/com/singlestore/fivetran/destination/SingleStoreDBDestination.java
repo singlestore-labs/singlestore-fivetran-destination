@@ -6,7 +6,7 @@ import org.apache.commons.cli.*;
 import java.io.IOException;
 
 public class SingleStoreDBDestination {
-    public static void main(String[] args) throws InterruptedException, IOException {
+    public static void main(String[] args) throws InterruptedException, IOException, ParseException {
         Options options = new Options();
         Option portOption = new Option("p", "port", true, "port which server will listen");
         options.addOption(portOption);
@@ -22,7 +22,7 @@ public class SingleStoreDBDestination {
             System.out.println(e.getMessage());
             formatter.printHelp("singlestoredb-fivetran-destination", options);
 
-            System.exit(1);
+            throw e;
         }
         
         String portStr = cmd.getOptionValue("port", "50052");
@@ -34,7 +34,7 @@ public class SingleStoreDBDestination {
             System.out.printf("Failed to parse --port option: %s%n", e.getMessage());
             formatter.printHelp("singlestoredb-fivetran-destination", options);
 
-            System.exit(1);
+            throw e;
         }
 
         // TODO: PLAT-6892 make consistent logging
