@@ -1,5 +1,6 @@
 package com.singlestore.fivetran.destination.writers;
 
+import com.google.protobuf.ByteString;
 import com.singlestore.fivetran.destination.JDBCUtil;
 import fivetran_sdk.Column;
 import fivetran_sdk.CsvFileParams;
@@ -21,8 +22,8 @@ public class DeleteWriter extends Writer {
     List<Column> pkColumns = new ArrayList<>();
     List<List<String>> batch = new ArrayList<>();
 
-    public DeleteWriter(Connection conn, String database, Table table, CsvFileParams params) {
-        super(conn, database, table, params);
+    public DeleteWriter(Connection conn, String database, Table table, CsvFileParams params, Map<String, ByteString> secretKeys) {
+        super(conn, database, table, params, secretKeys);
     }
 
     @Override

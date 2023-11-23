@@ -175,14 +175,14 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
         try (
                 Connection conn = JDBCUtil.createConnection(conf);
         ) {
-            LoadDataWriter w = new LoadDataWriter(conn, request.getSchemaName(), request.getTable(), request.getCsv());
+            LoadDataWriter w = new LoadDataWriter(conn, request.getSchemaName(), request.getTable(), request.getCsv(), request.getKeysMap());
             for (String file : request.getReplaceFilesList()) {
                 System.out.println("Upsert file: " + file);
                 w.write(file);
             }
             w.commit();
 
-            UpdateWriter u = new UpdateWriter(conn, request.getSchemaName(), request.getTable(), request.getCsv());
+            UpdateWriter u = new UpdateWriter(conn, request.getSchemaName(), request.getTable(), request.getCsv(), request.getKeysMap());
             for (String file : request.getUpdateFilesList()) {
                 System.out.println("Update file: " + file);
                 u.write(file);
@@ -190,7 +190,7 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
             u.commit();
 
 
-            DeleteWriter d = new DeleteWriter(conn, request.getSchemaName(), request.getTable(), request.getCsv());
+            DeleteWriter d = new DeleteWriter(conn, request.getSchemaName(), request.getTable(), request.getCsv(), request.getKeysMap());
             for (String file : request.getDeleteFilesList()) {
                 System.out.println("Delete file: " + file);
                 d.write(file);
@@ -200,6 +200,7 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
             responseObserver.onNext(WriteBatchResponse.newBuilder().setSuccess(true).build());
             responseObserver.onCompleted();
         } catch (Exception e) {
+            System.out.println(e.getMessage());
             responseObserver.onNext(WriteBatchResponse.newBuilder()
                     .setSuccess(false)
                     .setFailure(e.getMessage())

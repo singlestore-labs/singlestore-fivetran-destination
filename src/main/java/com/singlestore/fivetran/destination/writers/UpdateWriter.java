@@ -1,5 +1,6 @@
 package com.singlestore.fivetran.destination.writers;
 
+import com.google.protobuf.ByteString;
 import com.singlestore.fivetran.destination.JDBCUtil;
 import fivetran_sdk.Column;
 import fivetran_sdk.CsvFileParams;
@@ -13,8 +14,8 @@ import java.util.Map;
 
 // TODO: PLAT-6897 allow to configure batch size in writers
 public class UpdateWriter extends Writer {
-    public UpdateWriter(Connection conn, String database, Table table, CsvFileParams params) {
-        super(conn, database ,table, params);
+    public UpdateWriter(Connection conn, String database, Table table, CsvFileParams params, Map<String, ByteString> secretKeys) {
+        super(conn, database ,table, params, secretKeys);
     }
 
     List<Column> columns = new ArrayList<>();

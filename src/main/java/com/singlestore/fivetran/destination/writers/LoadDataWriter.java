@@ -1,5 +1,6 @@
 package com.singlestore.fivetran.destination.writers;
 
+import com.google.protobuf.ByteString;
 import com.singlestore.fivetran.destination.JDBCUtil;
 import fivetran_sdk.CsvFileParams;
 import fivetran_sdk.Table;
@@ -11,6 +12,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 // TODO: PLAT-6897 allow to configure batch size in writers
@@ -23,8 +25,8 @@ public class LoadDataWriter extends Writer {
     final SQLException[] queryException = new SQLException[1];
     Statement stmt;
 
-    public LoadDataWriter(Connection conn, String database, Table table, CsvFileParams params) throws IOException {
-        super(conn, database, table, params);
+    public LoadDataWriter(Connection conn, String database, Table table, CsvFileParams params, Map<String, ByteString> secretKeys) throws IOException {
+        super(conn, database, table, params, secretKeys);
     }
 
     @Override
