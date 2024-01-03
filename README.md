@@ -7,14 +7,33 @@
 ## Steps for starting server
 1. Build the Jar
 ```
-> gradle jar
+gradle jar
 ```
 2. Run the Jar
 ```
-> java -jar build/libs/singlestoredb-fivetran-destination.jar 
+java -jar build/libs/singlestoredb-fivetran-destination.jar 
 ```
 
-## Steps for testing
+## Steps for running Java tests
+1. Start SingleStoreDB cluster
+```
+docker run \
+    -d --name singlestoredb-dev \
+    -e SINGLESTORE_LICENSE="YOUR SINGLESTORE LICENSE" \
+    -e ROOT_PASSWORD="YOUR SINGLESTORE ROOT PASSWORD" \
+    -p 3306:3306 -p 8080:8080 -p 9000:9000 \
+    ghcr.io/singlestore-labs/singlestoredb-dev:latest
+```
+2. Create `ROOT_PASSWORD` environment variable
+```
+export ROOT_PASSWORD="YOUR SINGLESTORE ROOT PASSWORD"
+```
+3. Run tests
+```
+gradle build
+```
+
+## Steps for using Destination tester
 1. Start SingleStoreDB cluster
 2. Re-create `tester` database
 ```

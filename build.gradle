@@ -39,6 +39,9 @@ dependencies {
     implementation 'com.opencsv:opencsv:5.8'
     implementation 'com.github.luben:zstd-jni:1.5.5-10'
     implementation 'commons-cli:commons-cli:1.6.0'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
 }
 
 protobuf {
@@ -77,4 +80,8 @@ jar {
     from {
         configurations.runtimeClasspath.filter{ it.exists() }.collect { it.isDirectory() ? it : zipTree(it) }
     }
+}
+
+test {
+    useJUnitPlatform()
 }

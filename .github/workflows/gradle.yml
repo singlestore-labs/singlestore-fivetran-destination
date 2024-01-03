@@ -21,6 +21,20 @@ jobs:
 
     runs-on: ubuntu-latest
 
+    services:
+      singlestore:
+        # check for new versions at https://github.com/singlestore-labs/singlestoredb-dev-image/pkgs/container/singlestoredb-dev/versions
+        image: ghcr.io/singlestore-labs/singlestoredb-dev:0.2.11
+        ports:
+          - "3306:3306"
+        env:
+          # if you want a free SingleStore license for your own use please visit https://www.singlestore.com/cloud-trial/
+          SINGLESTORE_LICENSE: ${{ secrets.SINGLESTORE_LICENSE }}
+          ROOT_PASSWORD: ${{ secrets.ROOT_PASSWORD }}
+
+    env:
+      ROOT_PASSWORD: ${{ secrets.ROOT_PASSWORD }}
+      
     steps:
     - uses: actions/checkout@v3
     - name: Set up JDK 11
