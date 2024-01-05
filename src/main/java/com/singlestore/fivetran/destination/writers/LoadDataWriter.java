@@ -2,7 +2,10 @@ package com.singlestore.fivetran.destination.writers;
 
 import com.google.protobuf.ByteString;
 import com.singlestore.fivetran.destination.JDBCUtil;
+
+import fivetran_sdk.Column;
 import fivetran_sdk.CsvFileParams;
+import fivetran_sdk.DataType;
 import fivetran_sdk.Table;
 
 import java.io.IOException;
@@ -11,6 +14,8 @@ import java.io.PipedOutputStream;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -19,6 +24,8 @@ import java.util.stream.Collectors;
 public class LoadDataWriter extends Writer {
 
     final int BUFFER_SIZE = 524288;
+
+    List<Column> columns = new ArrayList<>();
     PipedOutputStream outputStream = new PipedOutputStream();
     PipedInputStream inputStream = new PipedInputStream(outputStream, BUFFER_SIZE);
     Thread t;
@@ -31,6 +38,15 @@ public class LoadDataWriter extends Writer {
 
     @Override
     public void setHeader(List<String> header) throws SQLException {
+        Map<String, Column> nameToColumn = new HashMap<>();
+        for (Column column : table.getColumnsList()) {
+            nameToColumn.put(column.getName(), column);
+        }
+
+        for (String name : header) {
+            columns.add(nameToColumn.get(name));
+        }
+
         // TODO: PLAT-6898 add compression
         String query = String.format("LOAD DATA LOCAL INFILE '###.tsv' REPLACE INTO TABLE %s (%s) NULL DEFINED BY %s",
                 JDBCUtil.escapeTable(database, table.getName()),
@@ -59,6 +75,14 @@ public class LoadDataWriter extends Writer {
         try {
             for (int i = 0; i < row.size(); i++) {
                 String value = row.get(i);
+
+                if (columns.get(i).getType() == DataType.BOOLEAN) {
+                    if (row.get(i).equalsIgnoreCase("true")) {
+                        value = "1";
+                    } else if (row.get(i).equalsIgnoreCase("false")) {
+                        value = "0";
+                    }
+                }
 
                 if (value.indexOf('\\') != -1) {
                     value = value.replace("\\", "\\\\");

@@ -12,6 +12,7 @@ public class JDBCUtil {
         connectionProps.put("user", conf.user());
         connectionProps.put("password", conf.password());
         connectionProps.put("allowLocalInfile", "true");
+        connectionProps.put("transformedBitIsBoolean", "true");
 
         String url = String.format("jdbc:singlestore://%s:%d", conf.host(), conf.port());
         return DriverManager.getConnection(url, connectionProps);
@@ -56,7 +57,7 @@ public class JDBCUtil {
 
     static DataType mapDataTypes(Integer dataType, String typeName) {
         switch (typeName) {
-            case "TINYINT":
+            case "BOOLEAN":
                 return DataType.BOOLEAN;
             case "SMALLINT":
                 return DataType.SHORT;
