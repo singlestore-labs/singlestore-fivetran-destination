@@ -2,12 +2,14 @@ package com.singlestore.fivetran.destination;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -28,6 +30,58 @@ public class IntegrationTestBase {
         "password", password
     ));
 
+    void createAllTypesTable() throws SQLException {
+        try (
+            Connection conn = JDBCUtil.createConnection(conf);
+            Statement stmt = conn.createStatement()
+            ) {
+            stmt.execute(String.format("USE `%s`", database));
+            stmt.execute("CREATE ROWSTORE TABLE `allTypesTable` (\n" +
+                    "  `id` INTEGER,\n" +
+                    "  `boolColumn` BOOL,\n" +
+                    "  `booleanColumn` BOOLEAN,\n" +
+                    "  `bitColumn` BIT(64),\n" +
+                    "  `tinyintColumn` TINYINT,\n" +
+                    "  `smallintColumn` SMALLINT,\n" +
+                    "  `mediumintColumn` MEDIUMINT,\n" +
+                    "  `intColumn` INT,\n" +
+                    "  `integerColumn` INTEGER,\n" +
+                    "  `bigintColumn` BIGINT,\n" +
+                    "  `floatColumn` FLOAT,\n" +
+                    "  `doubleColumn` DOUBLE,\n" +
+                    "  `realColumn` REAL,\n" +
+                    "  `dateColumn` DATE,\n" +
+                    "  `timeColumn` TIME,\n" +
+                    "  `time6Column` TIME(6),\n" +
+                    "  `datetimeColumn` DATETIME,\n" +
+                    "  `datetime6Column` DATETIME(6),\n" +
+                    "  `timestampColumn` TIMESTAMP,\n" +
+                    "  `timestamp6Column` TIMESTAMP(6),\n" +
+                    "  `yearColumn` YEAR,\n" +
+                    "  `decimalColumn` DECIMAL(65, 30),\n" +
+                    "  `decColumn` DEC,\n" +
+                    "  `fixedColumn` FIXED,\n" +
+                    "  `numericColumn` NUMERIC,\n" +
+                    "  `charColumn` CHAR,\n" +
+                    "  `mediumtextColumn` MEDIUMTEXT,\n" +
+                    "  `binaryColumn` BINARY,\n" +
+                    "  `varcharColumn` VARCHAR(100),\n" +
+                    "  `varbinaryColumn` VARBINARY(100),\n" +
+                    "  `longtextColumn` LONGTEXT,\n" +
+                    "  `textColumn` TEXT,\n" +
+                    "  `tinytextColumn` TINYTEXT,\n" +
+                    "  `longblobColumn` LONGBLOB,\n" +
+                    "  `mediumblobColumn` MEDIUMBLOB,\n" +
+                    "  `blobColumn` BLOB,\n" +
+                    "  `tinyblobColumn` TINYBLOB,\n" +
+                    "  `jsonColumn` JSON,\n" +
+                    "  `geographyColumn` GEOGRAPHY,\n" +
+                    "  `geographypointColumn` GEOGRAPHYPOINT,\n" +
+                    "  PRIMARY KEY (`id`)\n" +
+                    ") ");
+        }
+    }
+
     @BeforeAll
     static void init() throws SQLException {
         try (
@@ -39,17 +93,21 @@ public class IntegrationTestBase {
         }
     }
 
-    @Test
-    // This is a small test to check that GitHub actions work well
-    public void test() throws SQLException {
-        try (
+    void checkResult(String query, List<List<String>> expected) throws SQLException {
+        try (            
             Connection conn = JDBCUtil.createConnection(conf);
-            Statement stmt = conn.createStatement();
-            ResultSet rs = stmt.executeQuery("SELECT 1")
+            Statement stmt = conn.createStatement()
             ) {
-            assertTrue(rs.next());
-            assertEquals(1, rs.getInt(1));
-            assertFalse(rs.next());
+            stmt.execute(String.format("USE `%s`", database));
+            try (ResultSet rs = stmt.executeQuery(query)) {
+                for (List<String> row: expected) {
+                    assertTrue(rs.next());
+                    for (int i = 0; i < row.size(); i++) {
+                        assertEquals(row.get(i), rs.getString(i+1));
+                    }
+                }
+                assertFalse(rs.next());
+            }
         }
     }
 }
