@@ -12,7 +12,6 @@ import java.util.*;
 public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.DestinationImplBase {
     @Override
     public void configurationForm(ConfigurationFormRequest request, StreamObserver<ConfigurationFormResponse> responseObserver) {
-        // TODO: PLAT-6891 add more configurations
         responseObserver.onNext(
                 ConfigurationFormResponse.newBuilder()
                     .setSchemaSelectionSupported(true)
