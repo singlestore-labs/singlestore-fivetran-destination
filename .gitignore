@@ -6,3 +6,5 @@ build
 
 # Ignore IntelliJ IDEA directory
 .idea
+
+src/main/proto/*
