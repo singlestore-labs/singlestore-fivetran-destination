@@ -13,9 +13,35 @@ public class JDBCUtil {
         connectionProps.put("password", conf.password());
         connectionProps.put("allowLocalInfile", "true");
         connectionProps.put("transformedBitIsBoolean", "true");
+        if (conf.sslMode() != null) {
+            connectionProps.put("sslMode", conf.sslMode());
+            if (!conf.sslMode().equals("disable")) {
+                putIfNotEmpty(connectionProps, "keyStore", conf.sslKeystore());
+                putIfNotEmpty(connectionProps, "keyStorePassword", conf.sslKeystorePassword());
+                putIfNotEmpty(connectionProps, "trustStore", conf.sslTruststore());
+                putIfNotEmpty(connectionProps, "trustStorePassword", conf.sslTruststorePassword());
+                putIfNotEmpty(connectionProps, "serverSslCert", conf.sslServerCert());
+            }
+        }
+        String driverParameters = conf.driverParameters();
+        if (driverParameters != null) {
+            Arrays.stream(driverParameters.split(";")).forEach(s -> {
+                String[] keyValue = s.split("=");
+                if (keyValue.length == 2) {
+                    putIfNotEmpty(connectionProps, keyValue[0], keyValue[1]);
+                }
+            });
+        }
 
         String url = String.format("jdbc:singlestore://%s:%d", conf.host(), conf.port());
         return DriverManager.getConnection(url, connectionProps);
+    }
+
+    private static void putIfNotEmpty(Properties props, String key, String value) {
+        if (key != null && !key.trim().isEmpty() && 
+            value != null && !value.trim().isEmpty()) {
+            props.put(key.trim(), value.trim());
+        }
     }
 
     static Table getTable(SingleStoreDBConfiguration conf, String database, String table) throws SQLException, TableNotExistException {
