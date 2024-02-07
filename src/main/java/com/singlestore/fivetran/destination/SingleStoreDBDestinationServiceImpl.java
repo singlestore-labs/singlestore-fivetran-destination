@@ -12,24 +12,107 @@ import java.util.*;
 public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.DestinationImplBase {
     @Override
     public void configurationForm(ConfigurationFormRequest request, StreamObserver<ConfigurationFormResponse> responseObserver) {
-        // TODO: PLAT-6891 add more configurations
         responseObserver.onNext(
                 ConfigurationFormResponse.newBuilder()
-                        .setSchemaSelectionSupported(true)
-                        .setTableSelectionSupported(true)
-                        .addAllFields(Arrays.asList(
-                                FormField.newBuilder()
-                                        .setName("host").setLabel("Host").setRequired(true).setTextField(TextField.PlainText).build(),
-                                FormField.newBuilder()
-                                        .setName("port").setLabel("Port").setRequired(true).setTextField(TextField.PlainText).build(),
-                                FormField.newBuilder()
-                                        .setName("user").setLabel("Username").setRequired(false).setTextField(TextField.PlainText).build(),
-                                FormField.newBuilder()
-                                        .setName("password").setLabel("Password").setRequired(false).setTextField(TextField.Password).build())
-                        )
-                        .addAllTests(Collections.singletonList(
-                                ConfigurationTest.newBuilder().setName("connect").setLabel("Tests connection").build()))
-                        .build());
+                    .setSchemaSelectionSupported(true)
+                    .setTableSelectionSupported(true)
+                    .addAllFields(Arrays.asList(
+                        FormField.newBuilder()
+                                .setName("host")
+                                .setLabel("Host")
+                                .setRequired(true)
+                                .setTextField(TextField.PlainText)
+                                .build(),
+                        FormField.newBuilder()
+                                .setName("port")
+                                .setLabel("Port")
+                                .setRequired(true)
+                                .setTextField(TextField.PlainText)
+                                .build(),
+                        FormField.newBuilder()
+                                .setName("user")
+                                .setLabel("Username")
+                                .setRequired(false)
+                                .setTextField(TextField.PlainText)
+                                .build(),
+                        FormField.newBuilder()
+                                .setName("password")
+                                .setLabel("Password")
+                                .setRequired(false)
+                                .setTextField(TextField.Password)
+                                .build(),
+                        FormField.newBuilder()
+                                .setName("ssl.mode")
+                                .setLabel("SSL mode")
+                                .setRequired(false)
+                                .setDescription("Whether to use an encrypted connection to SingleStore. Options include: " +
+                                    "'disable' to use an unencrypted connection (the default); " +
+                                    "'trust' to use a secure (encrypted) connection (no certificate and hostname validation); " +
+                                    "'verify_ca' to use a secure (encrypted) connection but additionally verify the server TLS certificate against the configured Certificate Authority " +
+                                    "(CA) certificates, or fail if no valid matching CA certificates are found; or" +
+                                    "'verify-full' like 'verify-ca' but additionally verify that the server certificate matches the host to which the connection is attempted.")
+                                .setDropdownField(DropdownField.newBuilder()
+                                    .addDropdownField("disable")
+                                    .addDropdownField("trust")
+                                    .addDropdownField("verify_ca")
+                                    .addDropdownField("verify-full"))
+                                .build(),
+                        FormField.newBuilder()
+                                .setName("ssl.keystore")
+                                .setLabel("SSL Keystore")
+                                .setRequired(false)
+                                .setDescription("The location of the key store file. " + 
+                                    "This is optional and can be used for two-way authentication between the client and the SingleStore Server.")
+                                .setTextField(TextField.PlainText)
+                                .build(),
+                        FormField.newBuilder()
+                                .setName("ssl.keystore.password")
+                                .setLabel("SSL Keystore Password")
+                                .setRequired(false)
+                                .setDescription("The password for the key store file. " + 
+                                    "This is optional and only needed if 'database.ssl.keystore' is configured.")
+                                .setTextField(TextField.Password)
+                                .build(),
+                        FormField.newBuilder()
+                                .setName("ssl.truststore")
+                                .setLabel("SSL Truststore")
+                                .setRequired(false)
+                                .setDescription("The location of the trust store file for the server certificate verification.")
+                                .setTextField(TextField.PlainText)
+                                .build(),
+                        FormField.newBuilder()
+                                .setName("ssl.truststore.password")
+                                .setLabel("SSL Truststore Password")
+                                .setRequired(false)
+                                .setDescription("The password for the trust store file. " + 
+                                    "Used to check the integrity of the truststore, and unlock the truststore.")
+                                .setTextField(TextField.Password)
+                                .build(),
+                        FormField.newBuilder()
+                                .setName("ssl.server.cert")
+                                .setLabel("SSL Server's Certificate")
+                                .setRequired(false)
+                                .setDescription("Server's certificate in DER format or the server's CA certificate. " +
+                                    "The certificate is added to the trust store, which allows the connection to trust a self-signed certificate.")
+                                .setTextField(TextField.PlainText)
+                                .build(),
+                        FormField.newBuilder()
+                                .setName("driver.parameters")
+                                .setLabel("Driver Parameters")
+                                .setRequired(false)
+                                .setDescription(
+                                    "Additional JDBC parameters to use with connection string to SingleStore server.\n"+
+                                    "Format: 'param1=value1; param2 = value2; ...'.\n"+ 
+                                    "The supported parameters are available in the https://docs.singlestore.com/cloud/developer-resources/connect-with-application-development-tools/connect-with-java-jdbc/the-singlestore-jdbc-driver/#connection-string-parameters .")
+                                .setTextField(TextField.PlainText)
+                                .build()
+                    ))
+                    .addAllTests(Collections.singletonList(
+                        ConfigurationTest.newBuilder()
+                            .setName("connect")
+                            .setLabel("Tests connection")
+                            .build()))
+                    .build());
 
         responseObserver.onCompleted();
     }
