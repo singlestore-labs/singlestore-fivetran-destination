@@ -45,7 +45,7 @@ public class JDBCUtil {
         }
     }
 
-    static Table getTable(SingleStoreDBConfiguration conf, String database, String table) throws SQLException, TableNotExistException {
+    static Table getTable(SingleStoreDBConfiguration conf, String database, String table) throws Exception {
         try (Connection conn = JDBCUtil.createConnection(conf)) {
             DatabaseMetaData metadata = conn.getMetaData();
 
@@ -131,7 +131,7 @@ public class JDBCUtil {
         }
     }
 
-    static String generateAlterTableQuery(AlterTableRequest request) throws SQLException, TableNotExistException {
+    static String generateAlterTableQuery(AlterTableRequest request) throws Exception {
         SingleStoreDBConfiguration conf = new SingleStoreDBConfiguration(request.getConfigurationMap());
 
         String database = request.getSchemaName();

@@ -189,7 +189,7 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
 
             responseObserver.onNext(CreateTableResponse.newBuilder().setSuccess(true).build());
             responseObserver.onCompleted();
-        } catch (SQLException e) {
+        } catch (Exception e) {
             responseObserver.onNext(CreateTableResponse.newBuilder()
                     .setSuccess(false)
                     .setFailure(e.getMessage())
@@ -216,7 +216,7 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
 
             responseObserver.onNext(AlterTableResponse.newBuilder().setSuccess(true).build());
             responseObserver.onCompleted();
-        } catch (SQLException | JDBCUtil.TableNotExistException e) {
+        } catch (Exception e) {
             responseObserver.onNext(AlterTableResponse.newBuilder()
                     .setSuccess(false)
                     .setFailure(e.getMessage())
@@ -240,7 +240,7 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
 
             responseObserver.onNext(TruncateResponse.newBuilder().setSuccess(true).build());
             responseObserver.onCompleted();
-        } catch (SQLException e) {
+        } catch (Exception e) {
             responseObserver.onNext(TruncateResponse.newBuilder()
                     .setSuccess(false)
                     .setFailure(e.getMessage())

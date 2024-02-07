@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
 
@@ -30,7 +29,7 @@ public class IntegrationTestBase {
         "password", password
     ));
 
-    void createAllTypesTable() throws SQLException {
+    void createAllTypesTable() throws Exception {
         try (
             Connection conn = JDBCUtil.createConnection(conf);
             Statement stmt = conn.createStatement()
@@ -83,7 +82,7 @@ public class IntegrationTestBase {
     }
 
     @BeforeAll
-    static void init() throws SQLException {
+    static void init() throws Exception {
         try (
             Connection conn = JDBCUtil.createConnection(conf);
             Statement stmt = conn.createStatement()
@@ -93,7 +92,7 @@ public class IntegrationTestBase {
         }
     }
 
-    void checkResult(String query, List<List<String>> expected) throws SQLException {
+    void checkResult(String query, List<List<String>> expected) throws Exception {
         try (            
             Connection conn = JDBCUtil.createConnection(conf);
             Statement stmt = conn.createStatement()
