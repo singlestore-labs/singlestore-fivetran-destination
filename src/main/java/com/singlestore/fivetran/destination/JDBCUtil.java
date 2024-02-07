@@ -7,7 +7,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 public class JDBCUtil {
-    static Connection createConnection(SingleStoreDBConfiguration conf) throws java.sql.SQLException{
+    static Connection createConnection(SingleStoreDBConfiguration conf) throws Exception {
         Properties connectionProps = new Properties();
         connectionProps.put("user", conf.user());
         connectionProps.put("password", conf.password());
@@ -25,12 +25,13 @@ public class JDBCUtil {
         }
         String driverParameters = conf.driverParameters();
         if (driverParameters != null) {
-            Arrays.stream(driverParameters.split(";")).forEach(s -> {
-                String[] keyValue = s.split("=");
-                if (keyValue.length == 2) {
-                    putIfNotEmpty(connectionProps, keyValue[0], keyValue[1]);
+            for (String parameter:driverParameters.split(";")) {
+                String[] keyValue = parameter.split("=");
+                if (keyValue.length != 2) {
+                    throw new Exception("Invalid value of `driverParameters` configuration");
                 }
-            });
+                putIfNotEmpty(connectionProps, keyValue[0], keyValue[1]);
+            }
         }
 
         String url = String.format("jdbc:singlestore://%s:%d", conf.host(), conf.port());
