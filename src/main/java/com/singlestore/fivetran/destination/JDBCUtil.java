@@ -238,7 +238,7 @@ public class JDBCUtil {
                 return "DATE";
             case NAIVE_DATETIME:
             case UTC_DATETIME:
-                return "DATETIME";
+                return "DATETIME(6)";
             case BINARY:
                 return "BLOB";
             case JSON:
@@ -251,36 +251,57 @@ public class JDBCUtil {
         }
     }
 
+    public static String formatISODateTime(String dateTime) {
+        return dateTime.replace("T", " ").replace("Z", "");
+    }
+
     public static void setParameter(PreparedStatement stmt, Integer id, DataType type, String value, String nullStr) throws SQLException {
         if (value.equals(nullStr)) {
             stmt.setNull(id, Types.NULL);
         } else {
             switch (type) {
                 case BOOLEAN:
-                    stmt.setBoolean(id, Boolean.parseBoolean(value));
+                    if (value.equalsIgnoreCase("true")) {
+                        stmt.setBoolean(id, true);    
+                    } else if (value.equalsIgnoreCase("false")) {
+                        stmt.setBoolean(id, false);    
+                    } else {
+                        stmt.setShort(id, Short.parseShort(value));
+                    }
+                    break;
                 case SHORT:
                     stmt.setShort(id, Short.parseShort(value));
+                    break;
                 case INT:
                     stmt.setInt(id, Integer.parseInt(value));
+                    break;
                 case LONG:
                     stmt.setLong(id, Long.parseLong(value));
+                    break;
                 case FLOAT:
                     stmt.setFloat(id, Float.parseFloat(value));
+                    break;
                 case DOUBLE:
                     stmt.setDouble(id, Double.parseDouble(value));
+                    break;
                 case BINARY:
                     stmt.setBytes(id, value.getBytes());
+                    break;
+
+                case NAIVE_DATETIME:
+                case UTC_DATETIME:
+                    stmt.setString(id, formatISODateTime(value));
+                    break;
 
                 case DECIMAL:
                 case NAIVE_DATE:
-                case NAIVE_DATETIME:
-                case UTC_DATETIME:
                 case XML:
                 case STRING:
                 case JSON:
                 case UNSPECIFIED:
                 default:
                     stmt.setString(id, value);
+                    break;
             }
         }
     }
