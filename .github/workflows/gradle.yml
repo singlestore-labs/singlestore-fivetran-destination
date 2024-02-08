@@ -46,7 +46,7 @@ jobs:
       uses: wei/wget@v1
       with:
         args: -O src/main/proto/common.proto https://raw.githubusercontent.com/fivetran/fivetran_sdk/main/common.proto
-    - name: Copy common.proto file
+    - name: Copy destination_sdk.proto file
       uses: wei/wget@v1
       with:
         args: -O src/main/proto/destination_sdk.proto https://raw.githubusercontent.com/fivetran/fivetran_sdk/main/destination_sdk.proto     
