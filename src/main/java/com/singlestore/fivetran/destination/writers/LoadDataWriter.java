@@ -76,12 +76,15 @@ public class LoadDataWriter extends Writer {
             for (int i = 0; i < row.size(); i++) {
                 String value = row.get(i);
 
-                if (columns.get(i).getType() == DataType.BOOLEAN) {
-                    if (row.get(i).equalsIgnoreCase("true")) {
+                DataType type = columns.get(i).getType();
+                if (type == DataType.BOOLEAN) {
+                    if (value.equalsIgnoreCase("true")) {
                         value = "1";
-                    } else if (row.get(i).equalsIgnoreCase("false")) {
+                    } else if (value.equalsIgnoreCase("false")) {
                         value = "0";
                     }
+                } else if (type == DataType.NAIVE_DATETIME || type == DataType.UTC_DATETIME) {
+                    value = JDBCUtil.formatISODateTime(value);
                 }
 
                 if (value.indexOf('\\') != -1) {

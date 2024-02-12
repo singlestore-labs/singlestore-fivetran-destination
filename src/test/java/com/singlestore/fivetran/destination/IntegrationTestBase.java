@@ -2,7 +2,6 @@ package com.singlestore.fivetran.destination;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.Connection;
@@ -11,7 +10,6 @@ import java.sql.Statement;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
 
 import com.google.common.collect.ImmutableMap;
 
@@ -28,6 +26,49 @@ public class IntegrationTestBase {
         "user", user,
         "password", password
     ));
+
+    static List<String> allTypesColumns = List.of(
+        "id",
+        "boolColumn",
+        "booleanColumn",
+        "bitColumn",
+        "tinyintColumn",
+        "smallintColumn",
+        "mediumintColumn",
+        "intColumn",
+        "integerColumn",
+        "bigintColumn",
+        "floatColumn",
+        "doubleColumn",
+        "realColumn",
+        "dateColumn",
+        "timeColumn",
+        "time6Column",
+        "datetimeColumn",
+        "datetime6Column",
+        "timestampColumn",
+        "timestamp6Column",
+        "yearColumn",
+        "decimalColumn",
+        "decColumn",
+        "fixedColumn",
+        "numericColumn",
+        "charColumn",
+        "mediumtextColumn",
+        "binaryColumn",
+        "varcharColumn",
+        "varbinaryColumn",
+        "longtextColumn",
+        "textColumn",
+        "tinytextColumn",
+        "longblobColumn",
+        "mediumblobColumn",
+        "blobColumn",
+        "tinyblobColumn",
+        "jsonColumn",
+        "geographyColumn",
+        "geographypointColumn"
+    );
 
     void createAllTypesTable() throws Exception {
         try (
