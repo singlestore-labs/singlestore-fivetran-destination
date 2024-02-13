@@ -17,15 +17,16 @@ public class IntegrationTestBase {
     static String host = "127.0.0.1";
     static String port = "3306";
     static String user = "root";
-    static String password = System.getenv("ROOT_PASSWORD");;
+    static String password = System.getenv("ROOT_PASSWORD");
     static String database = "db";
 
-    static SingleStoreDBConfiguration conf = new SingleStoreDBConfiguration(ImmutableMap.of(
+    static ImmutableMap<String, String> confMap = ImmutableMap.of(
         "host", host,
         "port", port,
         "user", user,
         "password", password
-    ));
+    );
+    static SingleStoreDBConfiguration conf = new SingleStoreDBConfiguration(confMap);
 
     static List<String> allTypesColumns = List.of(
         "id",

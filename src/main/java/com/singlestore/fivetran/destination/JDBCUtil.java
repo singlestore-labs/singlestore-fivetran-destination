@@ -4,6 +4,7 @@ import fivetran_sdk.*;
 
 import java.sql.*;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class JDBCUtil {
@@ -13,6 +14,8 @@ public class JDBCUtil {
         connectionProps.put("password", conf.password());
         connectionProps.put("allowLocalInfile", "true");
         connectionProps.put("transformedBitIsBoolean", "true");
+        connectionProps.put("transformedBitIsBoolean", "true");
+        connectionProps.put("allowMultiQueries", "true");
         if (conf.sslMode() != null) {
             connectionProps.put("sslMode", conf.sslMode());
             if (!conf.sslMode().equals("disable")) {
@@ -131,6 +134,18 @@ public class JDBCUtil {
         }
     }
 
+    static private Set<String> pkColumnNames(Table table) {
+        return table.getColumnsList()            
+            .stream()
+            .filter(column -> column.getPrimaryKey())
+            .map(column -> column.getName())
+            .collect(Collectors.toSet());
+    }
+
+    static private boolean pkEquals(Table t1, Table t2) {
+        return pkColumnNames(t1).equals(pkColumnNames(t2));
+    }
+
     static String generateAlterTableQuery(AlterTableRequest request) throws Exception {
         SingleStoreDBConfiguration conf = new SingleStoreDBConfiguration(request.getConfigurationMap());
 
@@ -140,18 +155,27 @@ public class JDBCUtil {
         Table oldTable = getTable(conf, database, table);
         Table newTable = request.getTable();
 
-        // TODO: throw an exception if PK differs
+        if (!pkEquals(oldTable, newTable)) {
+            throw new Exception("Changing PRIMARY KEY is not supported in SingleStore");
+        }
 
-        List<Column> oldColumns = oldTable.getColumnsList();
-        List<Column> newColumns = newTable.getColumnsList();
+        Map<String, Column> oldColumns = oldTable.getColumnsList()
+            .stream()
+            .collect(Collectors.toMap(Column::getName, Function.identity()));
 
-        Set<Column> columnsToDrop = new HashSet<>(oldColumns);
-        newColumns.forEach(columnsToDrop::remove);
+        List<Column> columnsToAdd = new ArrayList<>();
+        List<Column> columnsToChange = new ArrayList<>();
+        
+        for (Column column: newTable.getColumnsList()) {
+            Column oldColumn = oldColumns.get(column.getName());
+            if (oldColumn == null) {
+                columnsToAdd.add(column);
+            } else if (!oldColumn.equals(column)) {
+                columnsToChange.add(column);
+            }
+        }
 
-        Set<Column> columnsToAdd = new HashSet<>(newColumns);
-        oldColumns.forEach(columnsToAdd::remove);
-
-        return generateAlterTableQuery(database, table, columnsToDrop, columnsToAdd);
+        return generateAlterTableQuery(database, table, columnsToAdd, columnsToChange);
     }
 
     static String generateTruncateTableQuery(TruncateRequest request) {
@@ -161,26 +185,47 @@ public class JDBCUtil {
     }
 
     // TODO: PLAT-6895 generate several queries for columnstore tables
-    static String generateAlterTableQuery(String database, String table, Set<Column> columnsToDrop, Set<Column> columnsToAdd) {
-        if (columnsToDrop.isEmpty() && columnsToAdd.isEmpty()) {
+    static String generateAlterTableQuery(String database, String table, List<Column> columnsToAdd, List<Column> columnsToChange) {
+        if (columnsToAdd.isEmpty() && columnsToChange.isEmpty()) {
             return null;
         }
 
-        List<String> operations = new ArrayList<>();
+        String query = "";
 
-        columnsToDrop.forEach(column ->
-                operations.add(String.format("DROP %s",
-                        escapeIdentifier(column.getName()))));
-
-        columnsToAdd.forEach(column ->
-                operations.add(String.format("ADD %s",
-                        getColumnDefinition(column))));
-
-
-        return String.format("ALTER TABLE %s %s",
+        for (Column column: columnsToChange) {
+            String tmpColName = column.getName() + "_alter_tmp";
+            query += String.format("ALTER TABLE %s ADD COLUMN %s %s; ", 
                 escapeTable(database, table),
-                String.join(", ", operations)
-        );
+                escapeIdentifier(tmpColName),
+                mapDataTypes(column.getType(), column.getDecimal()));
+            query += String.format("UPDATE %s SET %s = %s :> %s; ", 
+                escapeTable(database, table),
+                escapeIdentifier(tmpColName),
+                escapeIdentifier(column.getName()),
+                mapDataTypes(column.getType(), column.getDecimal()));
+            query += String.format("ALTER TABLE %s DROP %s; ", 
+                escapeTable(database, table),
+                escapeIdentifier(column.getName()));
+            query += String.format("ALTER TABLE %s CHANGE %s %s; ", 
+                escapeTable(database, table),
+                tmpColName,
+                escapeIdentifier(column.getName()));
+        }
+
+        if (!columnsToAdd.isEmpty()) {
+            List<String> addOperations = new ArrayList<>();
+
+            columnsToAdd.forEach(column ->
+            addOperations.add(String.format("ADD %s",
+                            getColumnDefinition(column))));
+    
+            query += String.format("ALTER TABLE %s %s; ",
+                    escapeTable(database, table),
+                    String.join(", ", addOperations)
+            );    
+        }
+
+        return query;
     }
 
     static String generateCreateTableQuery(CreateTableRequest request) {
