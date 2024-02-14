@@ -3,6 +3,7 @@ package com.singlestore.fivetran.destination;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.sql.Connection;
+import java.sql.Statement;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -180,6 +181,34 @@ public class DescribeTableTest extends IntegrationTestBase {
             assertEquals("geographypointColumn", columns.get(39).getName());
             assertEquals(DataType.STRING, columns.get(39).getType());
             assertEquals(false, columns.get(39).getPrimaryKey());
+        }
+    }
+
+    @Test
+    public void scaleAndPrecision() throws Exception {
+        try (Connection conn = JDBCUtil.createConnection(conf);
+            Statement stmt = conn.createStatement();
+        ) {
+            stmt.executeQuery(String.format("USE %s", database));
+            stmt.executeQuery("CREATE TABLE scaleAndPrecision(" +
+                "dec1 DECIMAL(38, 30), " +
+                "dec2 DECIMAL(10, 5)" + 
+                ")");
+            Table t = JDBCUtil.getTable(conf, database, "scaleAndPrecision");
+            assertEquals("scaleAndPrecision", t.getName());
+            List<Column> columns = t.getColumnsList();
+
+            assertEquals("dec1", columns.get(0).getName());
+            assertEquals(DataType.DECIMAL, columns.get(0).getType());
+            assertEquals(false, columns.get(0).getPrimaryKey());
+            assertEquals(38, columns.get(0).getDecimal().getPrecision());
+            assertEquals(30, columns.get(0).getDecimal().getScale());
+
+            assertEquals("dec2", columns.get(1).getName());
+            assertEquals(DataType.DECIMAL, columns.get(1).getType());
+            assertEquals(false, columns.get(1).getPrimaryKey());
+            assertEquals(10, columns.get(1).getDecimal().getPrecision());
+            assertEquals(5, columns.get(1).getDecimal().getScale());
         }
     }
 }

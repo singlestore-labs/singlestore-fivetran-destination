@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import fivetran_sdk.Column;
 import fivetran_sdk.CreateTableRequest;
 import fivetran_sdk.DataType;
+import fivetran_sdk.DecimalParams;
 import fivetran_sdk.Table;
 
 public class CreateTableTest extends IntegrationTestBase {
@@ -171,6 +172,59 @@ public class CreateTableTest extends IntegrationTestBase {
             assertEquals("unspecified", columns.get(14).getName());
             assertEquals(DataType.STRING, columns.get(14).getType());
             assertEquals(false, columns.get(14).getPrimaryKey());
+        }
+    }
+
+    @Test
+    public void scaleAndPrecision() throws SQLException, Exception {
+        Table t = Table.newBuilder()
+            .setName("scaleAndPrecision")
+            .addAllColumns(Arrays.asList(
+                Column.newBuilder()
+                    .setName("dec1")
+                    .setType(DataType.DECIMAL)
+                    .setPrimaryKey(false)
+                    .setDecimal(DecimalParams
+                        .newBuilder()
+                        .setScale(31)
+                        .setPrecision(38))
+                    .build(),
+                Column.newBuilder()
+                    .setName("dec2")
+                    .setType(DataType.DECIMAL)
+                    .setPrimaryKey(false)
+                    .setDecimal(DecimalParams
+                        .newBuilder()
+                        .setScale(5)
+                        .setPrecision(10))
+                    .build()
+            )).build();
+        
+        CreateTableRequest request = CreateTableRequest.newBuilder()
+            .setSchemaName(database)
+            .setTable(t)
+            .build();
+
+        String query = JDBCUtil.generateCreateTableQuery(request);
+        try (Connection conn = JDBCUtil.createConnection(conf);
+            Statement stmt = conn.createStatement();
+        ) {
+            stmt.execute(query);
+            Table result = JDBCUtil.getTable(conf, database, "scaleAndPrecision");
+            assertEquals("scaleAndPrecision", result.getName());
+            List<Column> columns = result.getColumnsList();
+
+            assertEquals("dec1", columns.get(0).getName());
+            assertEquals(DataType.DECIMAL, columns.get(0).getType());
+            assertEquals(false, columns.get(0).getPrimaryKey());
+            assertEquals(38, columns.get(0).getDecimal().getPrecision());
+            assertEquals(30, columns.get(0).getDecimal().getScale());
+
+            assertEquals("dec2", columns.get(1).getName());
+            assertEquals(DataType.DECIMAL, columns.get(1).getType());
+            assertEquals(false, columns.get(1).getPrimaryKey());
+            assertEquals(10, columns.get(1).getDecimal().getPrecision());
+            assertEquals(5, columns.get(1).getDecimal().getScale());
         }
     }
 }

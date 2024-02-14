@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import fivetran_sdk.AlterTableRequest;
 import fivetran_sdk.Column;
 import fivetran_sdk.DataType;
+import fivetran_sdk.DecimalParams;
 import fivetran_sdk.Table;
 
 public class AlterTableTest extends IntegrationTestBase {
@@ -177,6 +178,49 @@ public class AlterTableTest extends IntegrationTestBase {
             checkResult("SELECT * FROM `severalOperations`", Arrays.asList(
                 Arrays.asList("5", "6", null)
             ));
+        }
+    }
+
+    @Test
+    public void changeScaleAndPrecision() throws SQLException, Exception {
+        try (Connection conn = JDBCUtil.createConnection(conf);
+            Statement stmt = conn.createStatement();
+        ) {
+            stmt.execute(String.format("USE %s", database));
+            stmt.execute("CREATE TABLE changeScaleAndPrecision(a DECIMAL(38, 30))");
+            stmt.execute("INSERT INTO changeScaleAndPrecision VALUES ('5.123')");
+
+            Table table = Table.newBuilder()
+                .setName("changeScaleAndPrecision")
+                .addAllColumns(Arrays.asList(
+                    Column.newBuilder()
+                        .setName("a")
+                        .setType(DataType.DECIMAL)
+                        .setDecimal(DecimalParams
+                            .newBuilder()
+                            .setScale(5)
+                            .setPrecision(10))
+                        .build()
+                )).build();
+        
+            AlterTableRequest request = AlterTableRequest.newBuilder()
+                .putAllConfiguration(confMap)
+                .setSchemaName(database)
+                .setTable(table)
+                .build();
+        
+            String query = JDBCUtil.generateAlterTableQuery(request);
+            stmt.execute(query);
+            Table result = JDBCUtil.getTable(conf, database, "changeScaleAndPrecision");
+            List<Column> columns = result.getColumnsList();
+            
+            assertEquals("a", columns.get(0).getName());
+            assertEquals(DataType.DECIMAL, columns.get(0).getType());
+            assertEquals(false, columns.get(0).getPrimaryKey());
+            assertEquals(10, columns.get(0).getDecimal().getPrecision());
+            assertEquals(5, columns.get(0).getDecimal().getScale());
+
+            checkResult("SELECT * FROM `changeScaleAndPrecision`", Arrays.asList(Arrays.asList("5.12300")));
         }
     }
 }
