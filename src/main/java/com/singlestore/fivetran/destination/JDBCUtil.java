@@ -14,7 +14,6 @@ public class JDBCUtil {
         connectionProps.put("password", conf.password());
         connectionProps.put("allowLocalInfile", "true");
         connectionProps.put("transformedBitIsBoolean", "true");
-        connectionProps.put("transformedBitIsBoolean", "true");
         connectionProps.put("allowMultiQueries", "true");
         if (conf.sslMode() != null) {
             connectionProps.put("sslMode", conf.sslMode());
@@ -190,26 +189,26 @@ public class JDBCUtil {
             return null;
         }
 
-        String query = "";
+        StringBuilder query = new StringBuilder();
 
         for (Column column: columnsToChange) {
             String tmpColName = column.getName() + "_alter_tmp";
-            query += String.format("ALTER TABLE %s ADD COLUMN %s %s; ", 
+            query.append(String.format("ALTER TABLE %s ADD COLUMN %s %s; ", 
                 escapeTable(database, table),
                 escapeIdentifier(tmpColName),
-                mapDataTypes(column.getType(), column.getDecimal()));
-            query += String.format("UPDATE %s SET %s = %s :> %s; ", 
+                mapDataTypes(column.getType(), column.getDecimal())));
+            query.append(String.format("UPDATE %s SET %s = %s :> %s; ", 
                 escapeTable(database, table),
                 escapeIdentifier(tmpColName),
                 escapeIdentifier(column.getName()),
-                mapDataTypes(column.getType(), column.getDecimal()));
-            query += String.format("ALTER TABLE %s DROP %s; ", 
+                mapDataTypes(column.getType(), column.getDecimal())));
+            query.append(String.format("ALTER TABLE %s DROP %s; ", 
                 escapeTable(database, table),
-                escapeIdentifier(column.getName()));
-            query += String.format("ALTER TABLE %s CHANGE %s %s; ", 
+                escapeIdentifier(column.getName())));
+            query.append(String.format("ALTER TABLE %s CHANGE %s %s; ", 
                 escapeTable(database, table),
                 tmpColName,
-                escapeIdentifier(column.getName()));
+                escapeIdentifier(column.getName())));
         }
 
         if (!columnsToAdd.isEmpty()) {
@@ -219,13 +218,13 @@ public class JDBCUtil {
             addOperations.add(String.format("ADD %s",
                             getColumnDefinition(column))));
     
-            query += String.format("ALTER TABLE %s %s; ",
+            query.append(String.format("ALTER TABLE %s %s; ",
                     escapeTable(database, table),
                     String.join(", ", addOperations)
-            );    
+            ));    
         }
 
-        return query;
+        return query.toString();
     }
 
     static String generateCreateTableQuery(CreateTableRequest request) {
