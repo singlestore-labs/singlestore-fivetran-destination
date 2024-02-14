@@ -68,12 +68,17 @@ public class JDBCUtil {
             List<Column> columns = new ArrayList<>();
             try (ResultSet columnsRS = metadata.getColumns(database, null, table, null)) {
                 while(columnsRS.next()) {
-                    columns.add(Column.newBuilder()
-                            .setName(columnsRS.getString("COLUMN_NAME"))
-                            .setType(JDBCUtil.mapDataTypes(columnsRS.getInt("DATA_TYPE"), columnsRS.getString("TYPE_NAME")))
-                            .setPrimaryKey(primaryKeys.contains(columnsRS.getString("COLUMN_NAME")))
-                            // TODO: PLAT-6894 get scale and precision
-                            .build());
+                    Column.Builder c = Column.newBuilder()
+                        .setName(columnsRS.getString("COLUMN_NAME"))
+                        .setType(JDBCUtil.mapDataTypes(columnsRS.getInt("DATA_TYPE"), columnsRS.getString("TYPE_NAME")))
+                        .setPrimaryKey(primaryKeys.contains(columnsRS.getString("COLUMN_NAME")));
+                    if (c.getType() == DataType.DECIMAL) {
+                        c.setDecimal(DecimalParams.newBuilder()
+                        .setScale(columnsRS.getInt("DECIMAL_DIGITS"))
+                        .setPrecision(columnsRS.getInt("COLUMN_SIZE"))
+                        .build());
+                    }
+                    columns.add(c.build());
                 }
             }
 
@@ -99,7 +104,6 @@ public class JDBCUtil {
                 return DataType.FLOAT;
             case "DOUBLE":
                 return DataType.DOUBLE;
-            // TODO: PLAT-6894 handle precision and scale
             case "DECIMAL":
                 return DataType.DECIMAL;
             case "DATE":
@@ -257,12 +261,10 @@ public class JDBCUtil {
     }
 
     static String getColumnDefinition(Column col) {
-        // TODO: PLAT-6894 handle scale and precision
         return String.format("%s %s", escapeIdentifier(col.getName()), mapDataTypes(col.getType(), col.getDecimal()));
     }
 
     static String mapDataTypes(DataType type, DecimalParams decimal) {
-        // TODO: PLAT-6894 handle scale and precision
         switch (type) {
             case BOOLEAN:
                 return "BOOL";
@@ -273,6 +275,11 @@ public class JDBCUtil {
             case LONG:
                 return "BIGINT";
             case DECIMAL:
+                if (decimal != null) {
+                    return String.format("DECIMAL (%d, %d)", 
+                        decimal.getPrecision(), 
+                        Math.min(30, decimal.getScale()));                    
+                }
                 return "DECIMAL";
             case FLOAT:
                 return "FLOAT";
