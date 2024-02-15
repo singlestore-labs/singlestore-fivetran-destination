@@ -3,6 +3,7 @@ package com.singlestore.fivetran.destination;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.Test;
 
 import com.singlestore.fivetran.destination.writers.DeleteWriter;
 import com.singlestore.fivetran.destination.writers.LoadDataWriter;
+import com.singlestore.fivetran.destination.writers.UpdateWriter;
 
 import fivetran_sdk.CsvFileParams;
 import fivetran_sdk.Table;
@@ -195,5 +197,70 @@ public class DeleteWriterTest extends IntegrationTestBase {
         }
 
         checkResult("SELECT * FROM `allTypesTableBigKey` ORDER BY id", Arrays.asList());
+    }
+
+    @Test
+    public void deletePartOfRows() throws SQLException, Exception {
+        try (Connection conn = JDBCUtil.createConnection(conf);
+            Statement stmt = conn.createStatement()) {
+            stmt.execute(String.format("USE %s", database));
+            stmt.execute("CREATE TABLE deletePartOfRows(id INT PRIMARY KEY, a INT, b INT)");
+            stmt.execute("INSERT INTO deletePartOfRows VALUES(1, 2, 3)");
+            stmt.execute("INSERT INTO deletePartOfRows VALUES(4, 5, 6)");
+            stmt.execute("INSERT INTO deletePartOfRows VALUES(7, 8, 9)");
+            stmt.execute("INSERT INTO deletePartOfRows VALUES(10, 11, 12)");
+            
+            Table t = JDBCUtil.getTable(conf, database, "deletePartOfRows");
+            CsvFileParams params = CsvFileParams.newBuilder()
+                .setNullString("NULL")
+                .setUnmodifiedString("unm")
+                .build();
+
+            DeleteWriter d = new DeleteWriter(conn, database, t, params, null);
+            d.setHeader(List.of("id", "a", "b"));
+            d.writeRow(List.of("4", "unm", "unm"));
+            d.writeRow(List.of("7", "unm", "unm"));
+            d.writeRow(List.of("100", "unm", "unm"));
+            d.commit();
+        }
+
+        checkResult("SELECT * FROM `deletePartOfRows` ORDER BY id", Arrays.asList(
+            Arrays.asList("1", "2", "3"),
+            Arrays.asList("10", "11", "12")
+        ));        
+    }
+
+    @Test
+    public void bigDelete() throws SQLException, Exception {
+        try (Connection conn = JDBCUtil.createConnection(conf);
+            Statement stmt = conn.createStatement()) {
+            stmt.execute(String.format("USE %s", database));
+            stmt.execute("CREATE TABLE bigDelete(id INT PRIMARY KEY)");
+
+            CsvFileParams params = CsvFileParams.newBuilder()
+                .setNullString("NULL")
+                .build();
+            Table t = JDBCUtil.getTable(conf, database, "bigDelete");
+            LoadDataWriter w = new LoadDataWriter(conn, database, t, params, null);        
+            w.setHeader(List.of("id"));
+            for (Integer i = 0; i < 20000; i++) {
+                w.writeRow(List.of(i.toString()));
+            }
+            w.commit();
+
+            DeleteWriter d = new DeleteWriter(conn, database, t, params, null);
+            d.setHeader(List.of("id"));
+            for (Integer i = 0; i < 10000; i++) {
+                d.writeRow(List.of(i.toString()));
+            }
+            d.commit();
+        }
+
+        List<List<String>> res = new ArrayList<>();
+        for (Integer i = 10000; i < 20000; i++) {
+            res.add(Arrays.asList(i.toString()));
+        }
+
+        checkResult("SELECT * FROM `bigDelete` ORDER BY id", res);        
     }
 }

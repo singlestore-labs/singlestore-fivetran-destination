@@ -1,6 +1,7 @@
 package com.singlestore.fivetran.destination;
 
 import java.sql.Connection;
+import java.sql.Statement;
 import java.util.Arrays;
 import java.util.List;
 
@@ -158,6 +159,40 @@ public class UpdateWriterTets extends IntegrationTestBase {
                 "POLYGON((1.00000000 1.00000000, 0.00000000 1.00000000, 0.00000000 0.00000000, 1.00000000 1.00000000))",
                 "POINT(-74.04451396 40.68924403)"
             )
+        ));
+    }
+
+    @Test
+    public void partialUpdate() throws Exception {
+        try (Connection conn = JDBCUtil.createConnection(conf);
+            Statement stmt = conn.createStatement()) {
+            stmt.execute(String.format("USE %s", database));
+            stmt.execute("CREATE TABLE partialUpdate(id INT PRIMARY KEY, a INT, b INT)");
+            stmt.execute("INSERT INTO partialUpdate VALUES(1, 2, 3)");
+            stmt.execute("INSERT INTO partialUpdate VALUES(4, 5, 6)");
+            stmt.execute("INSERT INTO partialUpdate VALUES(7, 8, 9)");
+            stmt.execute("INSERT INTO partialUpdate VALUES(10, 11, 12)");
+            
+            Table t = JDBCUtil.getTable(conf, database, "partialUpdate");
+            CsvFileParams params = CsvFileParams.newBuilder()
+                .setNullString("NULL")
+                .setUnmodifiedString("unm")
+                .build();
+
+            UpdateWriter u = new UpdateWriter(conn, database, t, params, null);
+            u.setHeader(List.of("id", "a", "b"));
+            u.writeRow(List.of("4", "unm", "1"));
+            u.writeRow(List.of("7", "10", "unm"));
+            u.writeRow(List.of("10", "unm", "unm"));
+            u.writeRow(List.of("unm", "unm", "unm"));
+            u.commit();
+        }
+
+        checkResult("SELECT * FROM `partialUpdate` ORDER BY id", Arrays.asList(
+            Arrays.asList("1", "2", "3"),
+            Arrays.asList("4", "5", "1"),
+            Arrays.asList("7", "10", "9"),
+            Arrays.asList("10", "11", "12")
         ));
     }
 }
