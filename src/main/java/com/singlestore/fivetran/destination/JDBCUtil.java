@@ -7,7 +7,13 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class JDBCUtil {
+    private static final Logger logger 
+      = LoggerFactory.getLogger(JDBCUtil.class);
+
     static Connection createConnection(SingleStoreDBConfiguration conf) throws Exception {
         Properties connectionProps = new Properties();
         connectionProps.put("user", conf.user());
@@ -56,7 +62,7 @@ public class JDBCUtil {
                     throw new TableNotExistException();
                 }
                 if (tables.next()) {
-                    Logger.warning(String.format("Found several tables that match %s name",
+                    logger.warn(String.format("Found several tables that match %s name",
                         JDBCUtil.escapeTable(database, table)));
                 }
             }

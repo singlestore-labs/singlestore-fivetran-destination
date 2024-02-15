@@ -9,7 +9,13 @@ import io.grpc.stub.StreamObserver;
 import java.sql.*;
 import java.util.*;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.DestinationImplBase {
+    private static final Logger logger 
+      = LoggerFactory.getLogger(SingleStoreDBDestinationServiceImpl.class);
+
     @Override
     public void configurationForm(ConfigurationFormRequest request, StreamObserver<ConfigurationFormResponse> responseObserver) {
         responseObserver.onNext(
@@ -128,7 +134,7 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
             ) {
                 stmt.execute("SELECT 1");
             } catch (Exception e) {
-                Logger.warning("Test failed", e);
+                logger.warn("Test failed", e);
 
                 responseObserver.onNext(TestResponse.newBuilder().setSuccess(false).setFailure(e.getMessage()).build());
                 responseObserver.onCompleted();
@@ -156,7 +162,7 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
             responseObserver.onNext(response);
             responseObserver.onCompleted();
         } catch (JDBCUtil.TableNotExistException e) {
-            Logger.warning(String.format("Table %s doesn't exist", 
+            logger.warn(String.format("Table %s doesn't exist", 
                 JDBCUtil.escapeTable(database, table)));
 
             DescribeTableResponse response = DescribeTableResponse.newBuilder()
@@ -165,7 +171,7 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
             responseObserver.onNext(response);
             responseObserver.onCompleted();
         } catch (Exception e) {
-            Logger.warning(String.format("DescribeTable failed for %s", 
+            logger.warn(String.format("DescribeTable failed for %s", 
                 JDBCUtil.escapeTable(database, table)), e);
 
             DescribeTableResponse response = DescribeTableResponse.newBuilder()
@@ -185,13 +191,13 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
                 Connection conn = JDBCUtil.createConnection(conf);
                 Statement stmt = conn.createStatement()
         ) {
-            Logger.info(String.format("Executing SQL:\n %s", query));
+            logger.info(String.format("Executing SQL:\n %s", query));
             stmt.execute(query);
 
             responseObserver.onNext(CreateTableResponse.newBuilder().setSuccess(true).build());
             responseObserver.onCompleted();
         } catch (Exception e) {
-            Logger.warning(String.format("CreateTable failed for %s", 
+            logger.warn(String.format("CreateTable failed for %s", 
                 JDBCUtil.escapeTable(request.getSchemaName(), request.getTable().getName())), e);
 
             responseObserver.onNext(CreateTableResponse.newBuilder()
@@ -213,14 +219,14 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
             String query = JDBCUtil.generateAlterTableQuery(request);
             // query is null when table is not changed
             if (query != null) {
-                Logger.info(String.format("Executing SQL:\n %s", query));
+                logger.info(String.format("Executing SQL:\n %s", query));
                 stmt.execute(query);
             }
 
             responseObserver.onNext(AlterTableResponse.newBuilder().setSuccess(true).build());
             responseObserver.onCompleted();
         } catch (Exception e) {
-            Logger.warning(String.format("AlterTable failed for %s", 
+            logger.warn(String.format("AlterTable failed for %s", 
                 JDBCUtil.escapeTable(request.getSchemaName(), request.getTable().getName())), e);
 
             responseObserver.onNext(AlterTableResponse.newBuilder()
@@ -240,13 +246,13 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
                 Statement stmt = conn.createStatement()
         ) {
             String query = JDBCUtil.generateTruncateTableQuery(request);
-            Logger.info(String.format("Executing SQL:\n %s", query));
+            logger.info(String.format("Executing SQL:\n %s", query));
             stmt.execute(query);
 
             responseObserver.onNext(TruncateResponse.newBuilder().setSuccess(true).build());
             responseObserver.onCompleted();
         } catch (Exception e) {
-            Logger.warning(String.format("TruncateTable failed for %s", 
+            logger.warn(String.format("TruncateTable failed for %s", 
                 JDBCUtil.escapeTable(request.getSchemaName(), request.getTableName())), e);
 
             responseObserver.onNext(TruncateResponse.newBuilder()
@@ -286,7 +292,7 @@ public class SingleStoreDBDestinationServiceImpl extends DestinationGrpc.Destina
             responseObserver.onNext(WriteBatchResponse.newBuilder().setSuccess(true).build());
             responseObserver.onCompleted();
         } catch (Exception e) {
-            Logger.warning(String.format("WriteBatch failed for %s", 
+            logger.warn(String.format("WriteBatch failed for %s", 
                 JDBCUtil.escapeTable(request.getSchemaName(), request.getTable().getName())), e);
 
             responseObserver.onNext(WriteBatchResponse.newBuilder()

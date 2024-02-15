@@ -2,10 +2,15 @@ package com.singlestore.fivetran.destination;
 
 import io.grpc.*;
 import org.apache.commons.cli.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
 public class SingleStoreDBDestination {
+    private static final Logger logger 
+      = LoggerFactory.getLogger(SingleStoreDBDestination.class);
+
     public static void main(String[] args) throws InterruptedException, IOException, ParseException {
         Options options = new Options();
         Option portOption = new Option("p", "port", true, "port which server will listen");
@@ -18,7 +23,7 @@ public class SingleStoreDBDestination {
         try {
             cmd = parser.parse(options, args);
         } catch (ParseException e) {
-            Logger.severe("Failed to parse arguments", e);
+            logger.error("Failed to parse arguments", e);
             formatter.printHelp("singlestoredb-fivetran-destination", options);
 
             throw e;
@@ -29,19 +34,19 @@ public class SingleStoreDBDestination {
         try {
             port = Integer.parseInt(portStr);
         } catch (NumberFormatException e) {
-            Logger.warning("Failed to parse --port option", e);
+            logger.warn("Failed to parse --port option", e);
             formatter.printHelp("singlestoredb-fivetran-destination", options);
 
             throw e;
         }
 
-        Logger.info(String.format("Starting Destination gRPC server which listens port %d", port));
+        logger.info(String.format("Starting Destination gRPC server which listens port %d", port));
         Server server = ServerBuilder
                 .forPort(port)
                 .addService(new SingleStoreDBDestinationServiceImpl()).build();
 
         server.start();
-        Logger.info(String.format("Destination gRPC server started"));
+        logger.info(String.format("Destination gRPC server started"));
         server.awaitTermination();
     }
 }

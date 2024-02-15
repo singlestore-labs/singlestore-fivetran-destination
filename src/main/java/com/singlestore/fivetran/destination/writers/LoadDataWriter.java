@@ -2,7 +2,6 @@ package com.singlestore.fivetran.destination.writers;
 
 import com.google.protobuf.ByteString;
 import com.singlestore.fivetran.destination.JDBCUtil;
-import com.singlestore.fivetran.destination.Logger;
 
 import fivetran_sdk.Column;
 import fivetran_sdk.CsvFileParams;
@@ -21,8 +20,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 // TODO: PLAT-6897 allow to configure batch size in writers
 public class LoadDataWriter extends Writer {
+    private static final Logger logger 
+      = LoggerFactory.getLogger(JDBCUtil.class);
 
     final int BUFFER_SIZE = 524288;
 
@@ -65,7 +69,7 @@ public class LoadDataWriter extends Writer {
                 stmt.executeUpdate(query);
                 stmt.close();
             } catch (SQLException e) {
-                Logger.warning("Failed to execute LOAD DATA query", e);
+                logger.warn("Failed to execute LOAD DATA query", e);
                 queryException[0] = e;
             }
         });
@@ -108,7 +112,7 @@ public class LoadDataWriter extends Writer {
                 }
             }
         } catch (Exception e) {
-            Logger.warning("Failed to write TSV data to stream", e);
+            logger.warn("Failed to write TSV data to stream", e);
             abort(e);
         }
     }
@@ -127,19 +131,19 @@ public class LoadDataWriter extends Writer {
         try {
             outputStream.close();
         } catch (Exception e) {
-            Logger.warning("Failed to close the stream during the abort", e);
-        }
-
-        try {
-            stmt.cancel();
-        } catch (Exception e) {
-            Logger.warning("Failed to cancel the statement during the abort", e);
-        }
-
-        try {
-            t.interrupt();
-        } catch (Exception e) {
-            Logger.warning("Failed to interrupt the thread during the abort", e);
+            logger.warn("Failed to close the stream during the abort", e);
+        } finally {
+            try {
+                stmt.cancel();
+            } catch (Exception e) {
+                logger.warn("Failed to cancel the statement during the abort", e);
+            } finally {
+                try {
+                    t.interrupt();
+                } catch (Exception e) {
+                    logger.warn("Failed to interrupt the thread during the abort", e);
+                }        
+            }
         }
 
         if (writerException instanceof IOException && writerException.getMessage().contains("Pipe closed")) {
