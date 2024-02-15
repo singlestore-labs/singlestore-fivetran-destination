@@ -55,7 +55,10 @@ public class JDBCUtil {
                 if (!tables.next()) {
                     throw new TableNotExistException();
                 }
-                // TODO: PLAT-6892 print warning if several tables returned
+                if (tables.next()) {
+                    Logger.warning(String.format("Found several tables that match %s name",
+                        JDBCUtil.escapeTable(database, table)));
+                }
             }
 
             Set<String> primaryKeys = new HashSet<>();
