@@ -18,8 +18,7 @@ public class SingleStoreDBDestination {
         try {
             cmd = parser.parse(options, args);
         } catch (ParseException e) {
-            // TODO: PLAT-6892 make consistent logging
-            System.out.println(e.getMessage());
+            Logger.severe("Failed to parse arguments", e);
             formatter.printHelp("singlestoredb-fivetran-destination", options);
 
             throw e;
@@ -30,22 +29,19 @@ public class SingleStoreDBDestination {
         try {
             port = Integer.parseInt(portStr);
         } catch (NumberFormatException e) {
-            // TODO: PLAT-6892 make consistent logging
-            System.out.printf("Failed to parse --port option: %s%n", e.getMessage());
+            Logger.warning("Failed to parse --port option", e);
             formatter.printHelp("singlestoredb-fivetran-destination", options);
 
             throw e;
         }
 
-        // TODO: PLAT-6892 make consistent logging
-        System.out.printf("Starting Destination gRPC server which listens port %d%n", port);
+        Logger.info(String.format("Starting Destination gRPC server which listens port %d", port));
         Server server = ServerBuilder
                 .forPort(port)
                 .addService(new SingleStoreDBDestinationServiceImpl()).build();
 
         server.start();
-        // TODO: PLAT-6892 make consistent logging
-        System.out.println("Destination gRPC server started");
+        Logger.info(String.format("Destination gRPC server started"));
         server.awaitTermination();
     }
 }

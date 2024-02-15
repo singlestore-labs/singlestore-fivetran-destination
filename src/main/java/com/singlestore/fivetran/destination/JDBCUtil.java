@@ -187,7 +187,6 @@ public class JDBCUtil {
         );
     }
 
-    // TODO: PLAT-6895 generate several queries for columnstore tables
     static String generateAlterTableQuery(String database, String table, List<Column> columnsToAdd, List<Column> columnsToChange) {
         if (columnsToAdd.isEmpty() && columnsToChange.isEmpty()) {
             return null;
