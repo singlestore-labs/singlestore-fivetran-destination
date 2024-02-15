@@ -7,7 +7,13 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class JDBCUtil {
+    private static final Logger logger 
+      = LoggerFactory.getLogger(JDBCUtil.class);
+
     static Connection createConnection(SingleStoreDBConfiguration conf) throws Exception {
         Properties connectionProps = new Properties();
         connectionProps.put("user", conf.user());
@@ -55,7 +61,10 @@ public class JDBCUtil {
                 if (!tables.next()) {
                     throw new TableNotExistException();
                 }
-                // TODO: PLAT-6892 print warning if several tables returned
+                if (tables.next()) {
+                    logger.warn(String.format("Found several tables that match %s name",
+                        JDBCUtil.escapeTable(database, table)));
+                }
             }
 
             Set<String> primaryKeys = new HashSet<>();
@@ -187,7 +196,6 @@ public class JDBCUtil {
         );
     }
 
-    // TODO: PLAT-6895 generate several queries for columnstore tables
     static String generateAlterTableQuery(String database, String table, List<Column> columnsToAdd, List<Column> columnsToChange) {
         if (columnsToAdd.isEmpty() && columnsToChange.isEmpty()) {
             return null;

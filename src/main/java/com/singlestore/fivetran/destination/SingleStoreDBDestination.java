@@ -2,10 +2,15 @@ package com.singlestore.fivetran.destination;
 
 import io.grpc.*;
 import org.apache.commons.cli.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
 public class SingleStoreDBDestination {
+    private static final Logger logger 
+      = LoggerFactory.getLogger(SingleStoreDBDestination.class);
+
     public static void main(String[] args) throws InterruptedException, IOException, ParseException {
         Options options = new Options();
         Option portOption = new Option("p", "port", true, "port which server will listen");
@@ -18,8 +23,7 @@ public class SingleStoreDBDestination {
         try {
             cmd = parser.parse(options, args);
         } catch (ParseException e) {
-            // TODO: PLAT-6892 make consistent logging
-            System.out.println(e.getMessage());
+            logger.error("Failed to parse arguments", e);
             formatter.printHelp("singlestoredb-fivetran-destination", options);
 
             throw e;
@@ -30,22 +34,19 @@ public class SingleStoreDBDestination {
         try {
             port = Integer.parseInt(portStr);
         } catch (NumberFormatException e) {
-            // TODO: PLAT-6892 make consistent logging
-            System.out.printf("Failed to parse --port option: %s%n", e.getMessage());
+            logger.warn("Failed to parse --port option", e);
             formatter.printHelp("singlestoredb-fivetran-destination", options);
 
             throw e;
         }
 
-        // TODO: PLAT-6892 make consistent logging
-        System.out.printf("Starting Destination gRPC server which listens port %d%n", port);
+        logger.info(String.format("Starting Destination gRPC server which listens port %d", port));
         Server server = ServerBuilder
                 .forPort(port)
                 .addService(new SingleStoreDBDestinationServiceImpl()).build();
 
         server.start();
-        // TODO: PLAT-6892 make consistent logging
-        System.out.println("Destination gRPC server started");
+        logger.info(String.format("Destination gRPC server started"));
         server.awaitTermination();
     }
 }

@@ -20,8 +20,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 // TODO: PLAT-6897 allow to configure batch size in writers
 public class LoadDataWriter extends Writer {
+    private static final Logger logger 
+      = LoggerFactory.getLogger(JDBCUtil.class);
 
     final int BUFFER_SIZE = 524288;
 
@@ -64,6 +69,7 @@ public class LoadDataWriter extends Writer {
                 stmt.executeUpdate(query);
                 stmt.close();
             } catch (SQLException e) {
+                logger.warn("Failed to execute LOAD DATA query", e);
                 queryException[0] = e;
             }
         });
@@ -106,6 +112,7 @@ public class LoadDataWriter extends Writer {
                 }
             }
         } catch (Exception e) {
+            logger.warn("Failed to write TSV data to stream", e);
             abort(e);
         }
     }
@@ -123,15 +130,21 @@ public class LoadDataWriter extends Writer {
     private void abort(Exception writerException) throws Exception {
         try {
             outputStream.close();
-        } catch (Exception ignored) {}
-
-        try {
-            stmt.cancel();
-        } catch (Exception ignored) {}
-
-        try {
-            t.interrupt();
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            logger.warn("Failed to close the stream during the abort", e);
+        } finally {
+            try {
+                stmt.cancel();
+            } catch (Exception e) {
+                logger.warn("Failed to cancel the statement during the abort", e);
+            } finally {
+                try {
+                    t.interrupt();
+                } catch (Exception e) {
+                    logger.warn("Failed to interrupt the thread during the abort", e);
+                }        
+            }
+        }
 
         if (writerException instanceof IOException && writerException.getMessage().contains("Pipe closed")) {
             // The actual exception occurred in the query thread
