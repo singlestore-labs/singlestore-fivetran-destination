@@ -1,4 +1,4 @@
-# SingleStoreDB Fivetran Destination
+# SingleStore Fivetran Destination
 
 ## Pre-requisites for development
 - JDK v17
@@ -11,11 +11,11 @@ gradle jar
 ```
 2. Run the Jar
 ```
-java -jar build/libs/singlestoredb-fivetran-destination.jar 
+java -jar build/libs/singlestore-fivetran-destination.jar 
 ```
 
 ## Steps for running Java tests
-1. Start SingleStoreDB cluster
+1. Start SingleStore cluster
 ```
 docker run \
     -d --name singlestoredb-dev \
@@ -34,7 +34,7 @@ gradle build
 ```
 
 ## Steps for using Destination tester
-1. Start SingleStoreDB cluster
+1. Start SingleStore cluster
 2. Re-create `tester` database
 ```
 drop database if exists tester;

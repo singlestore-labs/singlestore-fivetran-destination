@@ -11,10 +11,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class JDBCUtil {
-    private static final Logger logger 
-      = LoggerFactory.getLogger(JDBCUtil.class);
+    private static final Logger logger = LoggerFactory.getLogger(JDBCUtil.class);
 
-    static Connection createConnection(SingleStoreDBConfiguration conf) throws Exception {
+    static Connection createConnection(SingleStoreConfiguration conf) throws Exception {
         Properties connectionProps = new Properties();
         connectionProps.put("user", conf.user());
         connectionProps.put("password", conf.password());
@@ -33,7 +32,7 @@ public class JDBCUtil {
         }
         String driverParameters = conf.driverParameters();
         if (driverParameters != null) {
-            for (String parameter:driverParameters.split(";")) {
+            for (String parameter : driverParameters.split(";")) {
                 String[] keyValue = parameter.split("=");
                 if (keyValue.length != 2) {
                     throw new Exception("Invalid value of `driverParameters` configuration");
@@ -47,13 +46,13 @@ public class JDBCUtil {
     }
 
     private static void putIfNotEmpty(Properties props, String key, String value) {
-        if (key != null && !key.trim().isEmpty() && 
-            value != null && !value.trim().isEmpty()) {
+        if (key != null && !key.trim().isEmpty() && value != null && !value.trim().isEmpty()) {
             props.put(key.trim(), value.trim());
         }
     }
 
-    static Table getTable(SingleStoreDBConfiguration conf, String database, String table) throws Exception {
+    static Table getTable(SingleStoreConfiguration conf, String database, String table)
+            throws Exception {
         try (Connection conn = JDBCUtil.createConnection(conf)) {
             DatabaseMetaData metadata = conn.getMetaData();
 
@@ -63,38 +62,36 @@ public class JDBCUtil {
                 }
                 if (tables.next()) {
                     logger.warn(String.format("Found several tables that match %s name",
-                        JDBCUtil.escapeTable(database, table)));
+                            JDBCUtil.escapeTable(database, table)));
                 }
             }
 
             Set<String> primaryKeys = new HashSet<>();
             try (ResultSet primaryKeysRS = metadata.getPrimaryKeys(database, null, table)) {
-                while(primaryKeysRS.next()) {
+                while (primaryKeysRS.next()) {
                     primaryKeys.add(primaryKeysRS.getString("COLUMN_NAME"));
                 }
             }
 
             List<Column> columns = new ArrayList<>();
             try (ResultSet columnsRS = metadata.getColumns(database, null, table, null)) {
-                while(columnsRS.next()) {
+                while (columnsRS.next()) {
                     Column.Builder c = Column.newBuilder()
-                        .setName(columnsRS.getString("COLUMN_NAME"))
-                        .setType(JDBCUtil.mapDataTypes(columnsRS.getInt("DATA_TYPE"), columnsRS.getString("TYPE_NAME")))
-                        .setPrimaryKey(primaryKeys.contains(columnsRS.getString("COLUMN_NAME")));
+                            .setName(columnsRS.getString("COLUMN_NAME"))
+                            .setType(JDBCUtil.mapDataTypes(columnsRS.getInt("DATA_TYPE"),
+                                    columnsRS.getString("TYPE_NAME")))
+                            .setPrimaryKey(
+                                    primaryKeys.contains(columnsRS.getString("COLUMN_NAME")));
                     if (c.getType() == DataType.DECIMAL) {
                         c.setDecimal(DecimalParams.newBuilder()
-                        .setScale(columnsRS.getInt("DECIMAL_DIGITS"))
-                        .setPrecision(columnsRS.getInt("COLUMN_SIZE"))
-                        .build());
+                                .setScale(columnsRS.getInt("DECIMAL_DIGITS"))
+                                .setPrecision(columnsRS.getInt("COLUMN_SIZE")).build());
                     }
                     columns.add(c.build());
                 }
             }
 
-            return Table.newBuilder()
-                    .setName(table)
-                    .addAllColumns(columns)
-                    .build();
+            return Table.newBuilder().setName(table).addAllColumns(columns).build();
         }
     }
 
@@ -147,11 +144,8 @@ public class JDBCUtil {
     }
 
     static private Set<String> pkColumnNames(Table table) {
-        return table.getColumnsList()            
-            .stream()
-            .filter(column -> column.getPrimaryKey())
-            .map(column -> column.getName())
-            .collect(Collectors.toSet());
+        return table.getColumnsList().stream().filter(column -> column.getPrimaryKey())
+                .map(column -> column.getName()).collect(Collectors.toSet());
     }
 
     static private boolean pkEquals(Table t1, Table t2) {
@@ -159,7 +153,7 @@ public class JDBCUtil {
     }
 
     static String generateAlterTableQuery(AlterTableRequest request) throws Exception {
-        SingleStoreDBConfiguration conf = new SingleStoreDBConfiguration(request.getConfigurationMap());
+        SingleStoreConfiguration conf = new SingleStoreConfiguration(request.getConfigurationMap());
 
         String database = request.getSchemaName();
         String table = request.getTable().getName();
@@ -171,14 +165,13 @@ public class JDBCUtil {
             throw new Exception("Changing PRIMARY KEY is not supported in SingleStore");
         }
 
-        Map<String, Column> oldColumns = oldTable.getColumnsList()
-            .stream()
-            .collect(Collectors.toMap(Column::getName, Function.identity()));
+        Map<String, Column> oldColumns = oldTable.getColumnsList().stream()
+                .collect(Collectors.toMap(Column::getName, Function.identity()));
 
         List<Column> columnsToAdd = new ArrayList<>();
         List<Column> columnsToChange = new ArrayList<>();
-        
-        for (Column column: newTable.getColumnsList()) {
+
+        for (Column column : newTable.getColumnsList()) {
             Column oldColumn = oldColumns.get(column.getName());
             if (oldColumn == null) {
                 columnsToAdd.add(column);
@@ -192,48 +185,40 @@ public class JDBCUtil {
 
     static String generateTruncateTableQuery(TruncateRequest request) {
         return String.format("TRUNCATE TABLE %s",
-                escapeTable(request.getSchemaName(), request.getTableName())
-        );
+                escapeTable(request.getSchemaName(), request.getTableName()));
     }
 
-    static String generateAlterTableQuery(String database, String table, List<Column> columnsToAdd, List<Column> columnsToChange) {
+    static String generateAlterTableQuery(String database, String table, List<Column> columnsToAdd,
+            List<Column> columnsToChange) {
         if (columnsToAdd.isEmpty() && columnsToChange.isEmpty()) {
             return null;
         }
 
         StringBuilder query = new StringBuilder();
 
-        for (Column column: columnsToChange) {
+        for (Column column : columnsToChange) {
             String tmpColName = column.getName() + "_alter_tmp";
-            query.append(String.format("ALTER TABLE %s ADD COLUMN %s %s; ", 
-                escapeTable(database, table),
-                escapeIdentifier(tmpColName),
-                mapDataTypes(column.getType(), column.getDecimal())));
-            query.append(String.format("UPDATE %s SET %s = %s :> %s; ", 
-                escapeTable(database, table),
-                escapeIdentifier(tmpColName),
-                escapeIdentifier(column.getName()),
-                mapDataTypes(column.getType(), column.getDecimal())));
-            query.append(String.format("ALTER TABLE %s DROP %s; ", 
-                escapeTable(database, table),
-                escapeIdentifier(column.getName())));
-            query.append(String.format("ALTER TABLE %s CHANGE %s %s; ", 
-                escapeTable(database, table),
-                tmpColName,
-                escapeIdentifier(column.getName())));
+            query.append(String.format("ALTER TABLE %s ADD COLUMN %s %s; ",
+                    escapeTable(database, table), escapeIdentifier(tmpColName),
+                    mapDataTypes(column.getType(), column.getDecimal())));
+            query.append(
+                    String.format("UPDATE %s SET %s = %s :> %s; ", escapeTable(database, table),
+                            escapeIdentifier(tmpColName), escapeIdentifier(column.getName()),
+                            mapDataTypes(column.getType(), column.getDecimal())));
+            query.append(String.format("ALTER TABLE %s DROP %s; ", escapeTable(database, table),
+                    escapeIdentifier(column.getName())));
+            query.append(String.format("ALTER TABLE %s CHANGE %s %s; ",
+                    escapeTable(database, table), tmpColName, escapeIdentifier(column.getName())));
         }
 
         if (!columnsToAdd.isEmpty()) {
             List<String> addOperations = new ArrayList<>();
 
-            columnsToAdd.forEach(column ->
-            addOperations.add(String.format("ADD %s",
-                            getColumnDefinition(column))));
-    
-            query.append(String.format("ALTER TABLE %s %s; ",
-                    escapeTable(database, table),
-                    String.join(", ", addOperations)
-            ));    
+            columnsToAdd.forEach(column -> addOperations
+                    .add(String.format("ADD %s", getColumnDefinition(column))));
+
+            query.append(String.format("ALTER TABLE %s %s; ", escapeTable(database, table),
+                    String.join(", ", addOperations)));
         }
 
         return query.toString();
@@ -244,32 +229,29 @@ public class JDBCUtil {
         String table = request.getTable().getName();
         String columnDefinitions = getColumnDefinitions(request.getTable().getColumnsList());
 
-        return String.format("CREATE TABLE %s (%s)",
-                escapeTable(database, table),
+        return String.format("CREATE TABLE %s (%s)", escapeTable(database, table),
                 columnDefinitions);
     }
 
     static String getColumnDefinitions(List<Column> columns) {
-        List<String> columnsDefinitions = columns.stream().map(
-                JDBCUtil::getColumnDefinition
-        ).collect(Collectors.toList());
+        List<String> columnsDefinitions =
+                columns.stream().map(JDBCUtil::getColumnDefinition).collect(Collectors.toList());
 
 
-        List<String> primaryKeyColumns = columns.stream()
-                .filter(Column::getPrimaryKey)
-                .map(column -> escapeIdentifier(column.getName())
-        ).collect(Collectors.toList());
+        List<String> primaryKeyColumns = columns.stream().filter(Column::getPrimaryKey)
+                .map(column -> escapeIdentifier(column.getName())).collect(Collectors.toList());
 
         if (!primaryKeyColumns.isEmpty()) {
-            columnsDefinitions.add(String.format("PRIMARY KEY (%s)",
-                            String.join(", ", primaryKeyColumns)));
+            columnsDefinitions
+                    .add(String.format("PRIMARY KEY (%s)", String.join(", ", primaryKeyColumns)));
         }
 
         return String.join(",\n", columnsDefinitions);
     }
 
     static String getColumnDefinition(Column col) {
-        return String.format("%s %s", escapeIdentifier(col.getName()), mapDataTypes(col.getType(), col.getDecimal()));
+        return String.format("%s %s", escapeIdentifier(col.getName()),
+                mapDataTypes(col.getType(), col.getDecimal()));
     }
 
     static String mapDataTypes(DataType type, DecimalParams decimal) {
@@ -284,9 +266,8 @@ public class JDBCUtil {
                 return "BIGINT";
             case DECIMAL:
                 if (decimal != null) {
-                    return String.format("DECIMAL (%d, %d)", 
-                        decimal.getPrecision(), 
-                        Math.min(30, decimal.getScale()));                    
+                    return String.format("DECIMAL (%d, %d)", decimal.getPrecision(),
+                            Math.min(30, decimal.getScale()));
                 }
                 return "DECIMAL";
             case FLOAT:
@@ -311,19 +292,26 @@ public class JDBCUtil {
     }
 
     public static String formatISODateTime(String dateTime) {
-        return dateTime.replace("T", " ").replace("Z", "");
+        dateTime = dateTime.replace("T", " ").replace("Z", "");
+        // SingleStore doesn't support more than 6 digits after a period
+        int dotPos = dateTime.indexOf(".", 0);
+        if (dotPos != -1 && dotPos + 6 < dateTime.length()) {
+            return dateTime.substring(0, dotPos + 6 + 1);
+        }
+        return dateTime;
     }
 
-    public static void setParameter(PreparedStatement stmt, Integer id, DataType type, String value, String nullStr) throws SQLException {
+    public static void setParameter(PreparedStatement stmt, Integer id, DataType type, String value,
+            String nullStr) throws SQLException {
         if (value.equals(nullStr)) {
             stmt.setNull(id, Types.NULL);
         } else {
             switch (type) {
                 case BOOLEAN:
                     if (value.equalsIgnoreCase("true")) {
-                        stmt.setBoolean(id, true);    
+                        stmt.setBoolean(id, true);
                     } else if (value.equalsIgnoreCase("false")) {
-                        stmt.setBoolean(id, false);    
+                        stmt.setBoolean(id, false);
                     } else {
                         stmt.setShort(id, Short.parseShort(value));
                     }
@@ -368,9 +356,11 @@ public class JDBCUtil {
     public static String escapeIdentifier(String ident) {
         return String.format("`%s`", ident.replace("`", "``"));
     }
+
     public static String escapeString(String ident) {
         return String.format("'%s'", ident.replace("'", "''"));
     }
+
     public static String escapeTable(String database, String table) {
         return escapeIdentifier(database) + "." + escapeIdentifier(table);
     }

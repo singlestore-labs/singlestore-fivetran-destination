@@ -8,3 +8,5 @@ build
 .idea
 
 src/main/proto/*
+data-folder/*
+!data-folder/batch.json

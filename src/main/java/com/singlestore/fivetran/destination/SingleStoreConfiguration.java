@@ -2,7 +2,7 @@ package com.singlestore.fivetran.destination;
 
 import java.util.Map;
 
-public class SingleStoreDBConfiguration {
+public class SingleStoreConfiguration {
     private final String host;
     private final Integer port;
     private final String user;
@@ -15,8 +15,7 @@ public class SingleStoreDBConfiguration {
     private final String sslServerCert;
     private final String driverParameters;
 
-
-    SingleStoreDBConfiguration(Map<String, String> conf) {
+    SingleStoreConfiguration(Map<String, String> conf) {
         this.host = conf.get("host");
         this.port = Integer.valueOf(conf.get("port"));
         this.user = conf.get("user");
@@ -31,7 +30,7 @@ public class SingleStoreDBConfiguration {
     }
 
     public String host() {
-         return host;
+        return host;
     }
 
     public Integer port() {
@@ -48,15 +47,15 @@ public class SingleStoreDBConfiguration {
 
     public String sslMode() {
         return sslMode;
-    }    
+    }
 
     public String sslKeystore() {
         return sslKeystore;
-    }    
+    }
 
     public String sslKeystorePassword() {
         return sslKeystorePassword;
-    }    
+    }
 
     public String sslTruststore() {
         return sslTruststore;

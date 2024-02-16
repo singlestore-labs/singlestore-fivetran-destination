@@ -1,0 +1,12 @@
+{
+    "java.configuration.updateBuildConfiguration": "interactive",
+    "files.watcherExclude": {
+        "**/build": true
+    },
+    "java.format.enabled": true,
+    "java.format.settings.url": "https://raw.githubusercontent.com/google/styleguide/gh-pages/eclipse-java-google-style.xml",
+    "[java]": {
+        "editor.defaultFormatter": "redhat.java"
+    },
+    "java.compile.nullAnalysis.mode": "automatic"
+}

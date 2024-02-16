@@ -10,14 +10,10 @@ import fivetran_sdk.Table;
 
 import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
-import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -34,7 +30,8 @@ abstract public class Writer {
     CsvFileParams params;
     Map<String, ByteString> secretKeys;
 
-    public Writer(Connection conn, String database, Table table, CsvFileParams params, Map<String, ByteString> secretKeys) {
+    public Writer(Connection conn, String database, Table table, CsvFileParams params,
+            Map<String, ByteString> secretKeys) {
         this.conn = conn;
         this.database = database;
         this.table = table;
@@ -43,6 +40,7 @@ abstract public class Writer {
     }
 
     abstract public void setHeader(List<String> header) throws SQLException;
+
     abstract public void writeRow(List<String> row) throws Exception;
 
     private IvParameterSpec readIV(FileInputStream is, String file) throws Exception {
@@ -51,8 +49,8 @@ abstract public class Writer {
         while (bytesRead != b.length) {
             int curBytesRead = is.read(b, bytesRead, b.length - bytesRead);
             if (curBytesRead == -1) {
-                throw new Exception(String.format("Failed to read initialization vector. File '%s' has only %d bytes",
-                        file,
+                throw new Exception(String.format(
+                        "Failed to read initialization vector. File '%s' has only %d bytes", file,
                         bytesRead));
             }
             bytesRead += curBytesRead;
@@ -86,7 +84,8 @@ abstract public class Writer {
                 uncompressed = new GZIPInputStream(decoded);
             }
 
-            try (CSVReader csvReader = new CSVReader(new BufferedReader(new InputStreamReader(uncompressed)))) {
+            try (CSVReader csvReader =
+                    new CSVReader(new BufferedReader(new InputStreamReader(uncompressed)))) {
                 String[] headerString = csvReader.readNext();
                 if (headerString == null) {
                     // finish if file is empty
@@ -94,19 +93,11 @@ abstract public class Writer {
                 }
 
                 List<String> header = new ArrayList<>(Arrays.asList(headerString));
-                // delete _fivetran_synced
-                header.remove(header.size() - 1);
-                // delete _fivetran_deleted
-                header.remove(header.size() - 1);
                 setHeader(header);
 
                 String[] tokens;
                 while ((tokens = csvReader.readNext()) != null) {
                     List<String> row = new ArrayList<>(Arrays.asList(tokens));
-                    // delete _fivetran_synced
-                    row.remove(row.size() - 1);
-                    // delete _fivetran_deleted
-                    row.remove(row.size() - 1);
                     writeRow(row);
                 }
             }
