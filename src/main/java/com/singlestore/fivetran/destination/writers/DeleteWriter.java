@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
 public class DeleteWriter extends Writer {
 
     // TODO: PLAT-6897 make batch size configurable
-    final int BATCH_SIZE = 10000;
+    final int BATCH_SIZE = 1000;
 
     List<Integer> pkIds = new ArrayList<>();
     List<Column> pkColumns = new ArrayList<>();

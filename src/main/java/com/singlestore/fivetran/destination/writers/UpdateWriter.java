@@ -45,7 +45,6 @@ public class UpdateWriter extends Writer {
 
         for (int i = 0; i < row.size(); i++) {
             Column c = columns.get(i);
-            // TODO: handle no update
             if (!row.get(i).equals(params.getUnmodifiedString())) {
                 if (firstUpdateColumn) {
                     updateClause.append(String.format("%s = ?", JDBCUtil.escapeIdentifier(c.getName())));
@@ -65,7 +64,12 @@ public class UpdateWriter extends Writer {
             }
         }
 
-        String query = updateClause.toString() + whereClause;
+        if (firstUpdateColumn) {
+            // No column is updated
+            return;
+        }
+
+        String query = updateClause.toString() + " " + whereClause;
 
         int paramIndex = 0;
         try (PreparedStatement stmt = conn.prepareStatement(query.toString())) {
