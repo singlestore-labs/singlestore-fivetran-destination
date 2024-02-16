@@ -22,7 +22,8 @@ public class DeleteWriter extends Writer {
     List<Column> pkColumns = new ArrayList<>();
     List<List<String>> batch = new ArrayList<>();
 
-    public DeleteWriter(Connection conn, String database, Table table, CsvFileParams params, Map<String, ByteString> secretKeys) {
+    public DeleteWriter(Connection conn, String database, Table table, CsvFileParams params,
+            Map<String, ByteString> secretKeys) {
         super(conn, database, table, params, secretKeys);
     }
 
@@ -61,10 +62,8 @@ public class DeleteWriter extends Writer {
                 JDBCUtil.escapeTable(database, table.getName())));
 
         String condition = pkColumns.stream()
-                .map(column -> String.format("%s = ?",
-                        JDBCUtil.escapeIdentifier(column.getName())))
+                .map(column -> String.format("%s = ?", JDBCUtil.escapeIdentifier(column.getName())))
                 .collect(Collectors.joining(" AND "));
-
 
         for (int i = 0; i < batch.size(); i++) {
             query.append("(");
@@ -80,9 +79,10 @@ public class DeleteWriter extends Writer {
             for (int i = 0; i < batch.size(); i++) {
                 List<String> row = batch.get(i);
                 for (int j = 0; j < pkIds.size(); j++) {
-                    int paramIndex = i*pkIds.size() + j + 1;
+                    int paramIndex = i * pkIds.size() + j + 1;
                     String value = row.get(pkIds.get(j));
-                    JDBCUtil.setParameter(stmt, paramIndex, pkColumns.get(j).getType(), value, params.getNullString());
+                    JDBCUtil.setParameter(stmt, paramIndex, pkColumns.get(j).getType(), value,
+                            params.getNullString());
                 }
             }
 

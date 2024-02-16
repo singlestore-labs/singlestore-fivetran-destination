@@ -19,95 +19,46 @@ import fivetran_sdk.Table;
 public class CreateTableTest extends IntegrationTestBase {
     @Test
     public void allDataTypes() throws SQLException, Exception {
-        Table allTypesCreateTable = Table.newBuilder()
-            .setName("allTypesCreateTable")
-            .addAllColumns(Arrays.asList(
-                Column.newBuilder()
-                    .setName("boolean")
-                    .setType(DataType.BOOLEAN)
-                    .setPrimaryKey(true)
-                    .build(),
-                Column.newBuilder()
-                    .setName("short")
-                    .setType(DataType.SHORT)
-                    .setPrimaryKey(true)
-                    .build(),
-                Column.newBuilder()
-                    .setName("int")
-                    .setType(DataType.INT)
-                    .setPrimaryKey(false)
-                    .build(),
-                Column.newBuilder()
-                    .setName("long")
-                    .setType(DataType.LONG)
-                    .setPrimaryKey(false)
-                    .build(),
-                Column.newBuilder()
-                    .setName("float")
-                    .setType(DataType.FLOAT)
-                    .setPrimaryKey(false)
-                    .build(),
-                Column.newBuilder()
-                    .setName("double")
-                    .setType(DataType.DOUBLE)
-                    .setPrimaryKey(false)
-                    .build(),
-                Column.newBuilder()
-                    .setName("decimal")
-                    .setType(DataType.DECIMAL)
-                    .setPrimaryKey(false)
-                    .build(),
-                Column.newBuilder()
-                    .setName("binary")
-                    .setType(DataType.BINARY)
-                    .setPrimaryKey(false)
-                    .build(),
-                Column.newBuilder()
-                    .setName("json")
-                    .setType(DataType.JSON)
-                    .setPrimaryKey(false)
-                    .build(),
-                Column.newBuilder()
-                    .setName("naive_date")
-                    .setType(DataType.NAIVE_DATE)
-                    .setPrimaryKey(false)
-                    .build(),
-                Column.newBuilder()
-                    .setName("naive_datetime")
-                    .setType(DataType.NAIVE_DATETIME)
-                    .setPrimaryKey(false)
-                    .build(),
-                Column.newBuilder()
-                    .setName("utc_datetime")
-                    .setType(DataType.UTC_DATETIME)
-                    .setPrimaryKey(false)
-                    .build(),
-                Column.newBuilder()
-                    .setName("string")
-                    .setType(DataType.STRING)
-                    .setPrimaryKey(false)
-                    .build(),
-                    Column.newBuilder()
-                    .setName("xml")
-                    .setType(DataType.XML)
-                    .setPrimaryKey(false)
-                    .build(),
-                Column.newBuilder()
-                    .setName("unspecified")
-                    .setType(DataType.UNSPECIFIED)
-                    .setPrimaryKey(false)
-                    .build()
-            )).build();
-        
-        CreateTableRequest request = CreateTableRequest.newBuilder()
-            .setSchemaName(database)
-            .setTable(allTypesCreateTable)
-            .build();
+        Table allTypesCreateTable = Table.newBuilder().setName("allTypesCreateTable")
+                .addAllColumns(Arrays.asList(
+                        Column.newBuilder().setName("boolean").setType(DataType.BOOLEAN)
+                                .setPrimaryKey(true).build(),
+                        Column.newBuilder().setName("short").setType(DataType.SHORT)
+                                .setPrimaryKey(true).build(),
+                        Column.newBuilder().setName("int").setType(DataType.INT)
+                                .setPrimaryKey(false).build(),
+                        Column.newBuilder().setName("long").setType(DataType.LONG)
+                                .setPrimaryKey(false).build(),
+                        Column.newBuilder().setName("float").setType(DataType.FLOAT)
+                                .setPrimaryKey(false).build(),
+                        Column.newBuilder().setName("double").setType(DataType.DOUBLE)
+                                .setPrimaryKey(false).build(),
+                        Column.newBuilder().setName("decimal").setType(DataType.DECIMAL)
+                                .setPrimaryKey(false).build(),
+                        Column.newBuilder().setName("binary").setType(DataType.BINARY)
+                                .setPrimaryKey(false).build(),
+                        Column.newBuilder().setName("json").setType(DataType.JSON)
+                                .setPrimaryKey(false).build(),
+                        Column.newBuilder().setName("naive_date").setType(DataType.NAIVE_DATE)
+                                .setPrimaryKey(false).build(),
+                        Column.newBuilder().setName("naive_datetime")
+                                .setType(DataType.NAIVE_DATETIME).setPrimaryKey(false).build(),
+                        Column.newBuilder().setName("utc_datetime").setType(DataType.UTC_DATETIME)
+                                .setPrimaryKey(false).build(),
+                        Column.newBuilder().setName("string").setType(DataType.STRING)
+                                .setPrimaryKey(false).build(),
+                        Column.newBuilder().setName("xml").setType(DataType.XML)
+                                .setPrimaryKey(false).build(),
+                        Column.newBuilder().setName("unspecified").setType(DataType.UNSPECIFIED)
+                                .setPrimaryKey(false).build()))
+                .build();
+
+        CreateTableRequest request = CreateTableRequest.newBuilder().setSchemaName(database)
+                .setTable(allTypesCreateTable).build();
 
         String query = JDBCUtil.generateCreateTableQuery(request);
         try (Connection conn = JDBCUtil.createConnection(conf);
-            Statement stmt = conn.createStatement();
-        ) {
+                Statement stmt = conn.createStatement();) {
             stmt.execute(query);
             Table result = JDBCUtil.getTable(conf, database, "allTypesCreateTable");
             assertEquals("allTypesCreateTable", result.getName());
@@ -177,38 +128,21 @@ public class CreateTableTest extends IntegrationTestBase {
 
     @Test
     public void scaleAndPrecision() throws SQLException, Exception {
-        Table t = Table.newBuilder()
-            .setName("scaleAndPrecision")
-            .addAllColumns(Arrays.asList(
-                Column.newBuilder()
-                    .setName("dec1")
-                    .setType(DataType.DECIMAL)
-                    .setPrimaryKey(false)
-                    .setDecimal(DecimalParams
-                        .newBuilder()
-                        .setScale(31)
-                        .setPrecision(38))
-                    .build(),
-                Column.newBuilder()
-                    .setName("dec2")
-                    .setType(DataType.DECIMAL)
-                    .setPrimaryKey(false)
-                    .setDecimal(DecimalParams
-                        .newBuilder()
-                        .setScale(5)
-                        .setPrecision(10))
-                    .build()
-            )).build();
-        
-        CreateTableRequest request = CreateTableRequest.newBuilder()
-            .setSchemaName(database)
-            .setTable(t)
-            .build();
+        Table t = Table.newBuilder().setName("scaleAndPrecision").addAllColumns(Arrays.asList(
+                Column.newBuilder().setName("dec1").setType(DataType.DECIMAL).setPrimaryKey(false)
+                        .setDecimal(DecimalParams.newBuilder().setScale(31).setPrecision(38))
+                        .build(),
+                Column.newBuilder().setName("dec2").setType(DataType.DECIMAL).setPrimaryKey(false)
+                        .setDecimal(DecimalParams.newBuilder().setScale(5).setPrecision(10))
+                        .build()))
+                .build();
+
+        CreateTableRequest request =
+                CreateTableRequest.newBuilder().setSchemaName(database).setTable(t).build();
 
         String query = JDBCUtil.generateCreateTableQuery(request);
         try (Connection conn = JDBCUtil.createConnection(conf);
-            Statement stmt = conn.createStatement();
-        ) {
+                Statement stmt = conn.createStatement();) {
             stmt.execute(query);
             Table result = JDBCUtil.getTable(conf, database, "scaleAndPrecision");
             assertEquals("scaleAndPrecision", result.getName());

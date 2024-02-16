@@ -25,8 +25,7 @@ import org.slf4j.LoggerFactory;
 
 // TODO: PLAT-6897 allow to configure batch size in writers
 public class LoadDataWriter extends Writer {
-    private static final Logger logger 
-      = LoggerFactory.getLogger(JDBCUtil.class);
+    private static final Logger logger = LoggerFactory.getLogger(JDBCUtil.class);
 
     final int BUFFER_SIZE = 524288;
 
@@ -37,7 +36,8 @@ public class LoadDataWriter extends Writer {
     final SQLException[] queryException = new SQLException[1];
     Statement stmt;
 
-    public LoadDataWriter(Connection conn, String database, Table table, CsvFileParams params, Map<String, ByteString> secretKeys) throws IOException {
+    public LoadDataWriter(Connection conn, String database, Table table, CsvFileParams params,
+            Map<String, ByteString> secretKeys) throws IOException {
         super(conn, database, table, params, secretKeys);
     }
 
@@ -53,16 +53,14 @@ public class LoadDataWriter extends Writer {
         }
 
         // TODO: PLAT-6898 add compression
-        String query = String.format("LOAD DATA LOCAL INFILE '###.tsv' REPLACE INTO TABLE %s (%s) NULL DEFINED BY %s",
+        String query = String.format(
+                "LOAD DATA LOCAL INFILE '###.tsv' REPLACE INTO TABLE %s (%s) NULL DEFINED BY %s",
                 JDBCUtil.escapeTable(database, table.getName()),
-                header.stream()
-                        .map(JDBCUtil::escapeIdentifier)
-                        .collect(Collectors.joining(", ")),
-                JDBCUtil.escapeString(params.getNullString())
-                );
+                header.stream().map(JDBCUtil::escapeIdentifier).collect(Collectors.joining(", ")),
+                JDBCUtil.escapeString(params.getNullString()));
 
         stmt = conn.createStatement();
-        ((com.singlestore.jdbc.Statement)stmt).setNextLocalInfileInputStream(inputStream);
+        ((com.singlestore.jdbc.Statement) stmt).setNextLocalInfileInputStream(inputStream);
 
         t = new Thread(() -> {
             try {
@@ -142,11 +140,12 @@ public class LoadDataWriter extends Writer {
                     t.interrupt();
                 } catch (Exception e) {
                     logger.warn("Failed to interrupt the thread during the abort", e);
-                }        
+                }
             }
         }
 
-        if (writerException instanceof IOException && writerException.getMessage().contains("Pipe closed")) {
+        if (writerException instanceof IOException
+                && writerException.getMessage().contains("Pipe closed")) {
             // The actual exception occurred in the query thread
             throw queryException[0];
         } else {

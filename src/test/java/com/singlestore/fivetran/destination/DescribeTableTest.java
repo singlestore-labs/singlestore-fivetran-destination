@@ -187,13 +187,10 @@ public class DescribeTableTest extends IntegrationTestBase {
     @Test
     public void scaleAndPrecision() throws Exception {
         try (Connection conn = JDBCUtil.createConnection(conf);
-            Statement stmt = conn.createStatement();
-        ) {
+                Statement stmt = conn.createStatement();) {
             stmt.executeQuery(String.format("USE %s", database));
-            stmt.executeQuery("CREATE TABLE scaleAndPrecision(" +
-                "dec1 DECIMAL(38, 30), " +
-                "dec2 DECIMAL(10, 5)" + 
-                ")");
+            stmt.executeQuery("CREATE TABLE scaleAndPrecision(" + "dec1 DECIMAL(38, 30), "
+                    + "dec2 DECIMAL(10, 5)" + ")");
             Table t = JDBCUtil.getTable(conf, database, "scaleAndPrecision");
             assertEquals("scaleAndPrecision", t.getName());
             List<Column> columns = t.getColumnsList();
