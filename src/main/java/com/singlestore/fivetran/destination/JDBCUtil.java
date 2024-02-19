@@ -229,14 +229,14 @@ public class JDBCUtil {
         String table = request.getTable().getName();
         String columnDefinitions = getColumnDefinitions(request.getTable().getColumnsList());
 
-        return String.format("CREATE TABLE %s (%s)", escapeTable(database, table),
+        return String.format("CREATE DATABASE IF NOT EXISTS %s; CREATE TABLE %s (%s)", escapeIdentifier(database),
+                escapeTable(database, table),
                 columnDefinitions);
     }
 
     static String getColumnDefinitions(List<Column> columns) {
-        List<String> columnsDefinitions =
-                columns.stream().map(JDBCUtil::getColumnDefinition).collect(Collectors.toList());
-
+        List<String> columnsDefinitions = columns.stream().map(JDBCUtil::getColumnDefinition)
+                .collect(Collectors.toList());
 
         List<String> primaryKeyColumns = columns.stream().filter(Column::getPrimaryKey)
                 .map(column -> escapeIdentifier(column.getName())).collect(Collectors.toList());

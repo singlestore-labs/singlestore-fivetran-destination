@@ -1,8 +1,10 @@
 package com.singlestore.fivetran.destination;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
@@ -159,6 +161,34 @@ public class CreateTableTest extends IntegrationTestBase {
             assertEquals(false, columns.get(1).getPrimaryKey());
             assertEquals(10, columns.get(1).getDecimal().getPrecision());
             assertEquals(5, columns.get(1).getDecimal().getScale());
+        }
+    }
+
+    @Test
+    public void newDatabase() throws Exception {
+        Table t = Table.newBuilder().setName("newDatabase").addAllColumns(Arrays.asList(Column
+                .newBuilder().setName("a").setType(DataType.INT).setPrimaryKey(false).build()))
+                .build();
+
+        CreateTableRequest request =
+                CreateTableRequest.newBuilder().setSchemaName(database).setTable(t).build();
+
+        String query = JDBCUtil.generateCreateTableQuery(request);
+        try (Connection conn = JDBCUtil.createConnection(conf);
+                Statement stmt = conn.createStatement();) {
+            stmt.execute(String.format("DROP DATABASE IF EXISTS %s", database));
+            stmt.execute(query);
+
+            try (ResultSet resultSet = conn.getMetaData().getCatalogs();) {
+                boolean databaseCreated = false;
+                while (resultSet.next()) {
+                    String databaseName = resultSet.getString(1);
+                    if (databaseName.equals(database)) {
+                        databaseCreated = true;
+                    }
+                }
+                assertTrue(databaseCreated);
+            }
         }
     }
 }
