@@ -51,6 +51,16 @@ public class JDBCUtil {
         }
     }
 
+    static boolean checkTableExists(Statement stmt, String database, String table) {
+        try {
+            stmt.executeQuery(
+                    String.format("SELECT * FROM %s WHERE 1=0", escapeTable(database, table)));
+        } catch (Exception ignored) {
+            return false;
+        }
+        return true;
+    }
+
     static Table getTable(SingleStoreConfiguration conf, String database, String table)
             throws Exception {
         try (Connection conn = JDBCUtil.createConnection(conf)) {
@@ -184,8 +194,21 @@ public class JDBCUtil {
     }
 
     static String generateTruncateTableQuery(TruncateRequest request) {
-        return String.format("TRUNCATE TABLE %s",
-                escapeTable(request.getSchemaName(), request.getTableName()));
+        String query;
+        if (request.hasSoft()) {
+            query = String.format("UPDATE %s SET %s = 1 ",
+                    escapeTable(request.getSchemaName(), request.getTableName()),
+                    escapeIdentifier(request.getSoft().getDeletedColumn()));
+        } else {
+            query = String.format("DELETE FROM %s ",
+                    escapeTable(request.getSchemaName(), request.getTableName()));
+        }
+
+        query += String.format("WHERE %s < FROM_UNIXTIME(%d.%09d)",
+                escapeIdentifier(request.getSyncedColumn()),
+                request.getUtcDeleteBefore().getSeconds(), request.getUtcDeleteBefore().getNanos());
+
+        return query;
     }
 
     static String generateAlterTableQuery(String database, String table, List<Column> columnsToAdd,
@@ -229,14 +252,13 @@ public class JDBCUtil {
         String table = request.getTable().getName();
         String columnDefinitions = getColumnDefinitions(request.getTable().getColumnsList());
 
-        return String.format("CREATE DATABASE IF NOT EXISTS %s; CREATE TABLE %s (%s)", escapeIdentifier(database),
-                escapeTable(database, table),
-                columnDefinitions);
+        return String.format("CREATE DATABASE IF NOT EXISTS %s; CREATE TABLE %s (%s)",
+                escapeIdentifier(database), escapeTable(database, table), columnDefinitions);
     }
 
     static String getColumnDefinitions(List<Column> columns) {
-        List<String> columnsDefinitions = columns.stream().map(JDBCUtil::getColumnDefinition)
-                .collect(Collectors.toList());
+        List<String> columnsDefinitions =
+                columns.stream().map(JDBCUtil::getColumnDefinition).collect(Collectors.toList());
 
         List<String> primaryKeyColumns = columns.stream().filter(Column::getPrimaryKey)
                 .map(column -> escapeIdentifier(column.getName())).collect(Collectors.toList());
