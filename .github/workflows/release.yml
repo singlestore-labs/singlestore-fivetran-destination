@@ -1,0 +1,52 @@
+name: Test
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    services:
+      singlestore:
+        # check for new versions at https://github.com/singlestore-labs/singlestoredb-dev-image/pkgs/container/singlestoredb-dev/versions
+        image: ghcr.io/singlestore-labs/singlestoredb-dev:0.2.11
+        ports:
+          - "3306:3306"
+        env:
+          # if you want a free SingleStore license for your own use please visit https://www.singlestore.com/cloud-trial/
+          SINGLESTORE_LICENSE: ${{ secrets.SINGLESTORE_LICENSE }}
+          ROOT_PASSWORD: ${{ secrets.ROOT_PASSWORD }}
+
+    env:
+      ROOT_PASSWORD: ${{ secrets.ROOT_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up JDK 11
+        uses: actions/setup-java@v3
+        with:
+          java-version: '11'
+          distribution: 'temurin'
+      - name: Copy common.proto file
+        uses: wei/wget@v1
+        with:
+          args: -O src/main/proto/common.proto https://raw.githubusercontent.com/fivetran/fivetran_sdk/main/common.proto
+      - name: Copy destination_sdk.proto file
+        uses: wei/wget@v1
+        with:
+          args: -O src/main/proto/destination_sdk.proto https://raw.githubusercontent.com/fivetran/fivetran_sdk/main/destination_sdk.proto
+      - name: Create Standalone Executable
+        uses: gradle/gradle-build-action@bd5760595778326ba7f1441bcf7e88b49de61a25 # v2.6.0
+        with:
+          arguments: runtime
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: build/image/bin/singlestore-fivetran-destination

@@ -5,10 +5,12 @@ plugins {
     id 'com.google.protobuf' version '0.9.1'
     // Generate IntelliJ IDEA's .idea & .iml project files
     id 'idea'
+    // Generate standalone executable
+    id 'org.beryx.runtime' version '1.13.1'
     id 'java'
 }
 
-repositories { 
+repositories {
     maven { // The google mirror is less flaky than mavenCentral()
         url "https://maven-central.storage-download.googleapis.com/maven2/"
 
@@ -17,11 +19,13 @@ repositories {
     mavenCentral()
 }
 
+version = '1.0.0'
+
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
 
-def grpcVersion = '1.51.3'
-def protobufVersion = '3.21.12'
+def grpcVersion = '1.59.1'
+def protobufVersion = '3.25.1'
 def protocVersion = protobufVersion
 
 dependencies {
@@ -90,4 +94,8 @@ test {
     testLogging {
         exceptionFormat = 'full'
     }
+}
+
+runtime {
+    options = ['--strip-debug', '--compress', '2', '--no-header-files', '--no-man-pages']
 }
