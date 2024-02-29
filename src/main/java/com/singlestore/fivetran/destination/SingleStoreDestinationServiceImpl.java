@@ -26,7 +26,7 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
                                 .setTextField(TextField.PlainText).build(),
                         FormField.newBuilder().setName("port").setLabel("Port").setRequired(true)
                                 .setTextField(TextField.PlainText).build(),
-                        FormField.newBuilder().setName("user").setLabel("Username")
+                        FormField.newBuilder().setName("user").setLabel("Username").setRequired(true)
                                 .setRequired(false).setTextField(TextField.PlainText).build(),
                         FormField.newBuilder().setName("password").setLabel("Password")
                                 .setRequired(false).setTextField(TextField.Password).build(),
