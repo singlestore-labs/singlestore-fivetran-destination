@@ -44,26 +44,6 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
                                         .addDropdownField("verify_ca")
                                         .addDropdownField("verify-full"))
                                 .build(),
-                        FormField.newBuilder().setName("ssl.keystore").setLabel("SSL Keystore")
-                                .setRequired(false)
-                                .setDescription("The location of the key store file. "
-                                        + "This is optional and can be used for two-way authentication between the client and the SingleStore Server.")
-                                .setTextField(TextField.PlainText).build(),
-                        FormField.newBuilder().setName("ssl.keystore.password")
-                                .setLabel("SSL Keystore Password").setRequired(false)
-                                .setDescription("The password for the key store file. "
-                                        + "This is optional and only needed if 'database.ssl.keystore' is configured.")
-                                .setTextField(TextField.Password).build(),
-                        FormField.newBuilder().setName("ssl.truststore").setLabel("SSL Truststore")
-                                .setRequired(false)
-                                .setDescription(
-                                        "The location of the trust store file for the server certificate verification.")
-                                .setTextField(TextField.PlainText).build(),
-                        FormField.newBuilder().setName("ssl.truststore.password")
-                                .setLabel("SSL Truststore Password").setRequired(false)
-                                .setDescription("The password for the trust store file. "
-                                        + "Used to check the integrity of the truststore, and unlock the truststore.")
-                                .setTextField(TextField.Password).build(),
                         FormField.newBuilder().setName("ssl.server.cert")
                                 .setLabel("SSL Server's Certificate").setRequired(false)
                                 .setDescription(
