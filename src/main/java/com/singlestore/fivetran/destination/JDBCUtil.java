@@ -23,10 +23,6 @@ public class JDBCUtil {
         if (conf.sslMode() != null) {
             connectionProps.put("sslMode", conf.sslMode());
             if (!conf.sslMode().equals("disable")) {
-                putIfNotEmpty(connectionProps, "keyStore", conf.sslKeystore());
-                putIfNotEmpty(connectionProps, "keyStorePassword", conf.sslKeystorePassword());
-                putIfNotEmpty(connectionProps, "trustStore", conf.sslTruststore());
-                putIfNotEmpty(connectionProps, "trustStorePassword", conf.sslTruststorePassword());
                 putIfNotEmpty(connectionProps, "serverSslCert", conf.sslServerCert());
             }
         }
