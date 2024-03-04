@@ -44,12 +44,13 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
                                                 FormField.newBuilder().setName("ssl.mode")
                                                                 .setLabel("SSL mode")
                                                                 .setRequired(false)
-                                                                .setDescription("Whether to use an encrypted connection to SingleStore. Options include: "
-                                                                                + "'disable' to use an unencrypted connection (the default); "
-                                                                                + "'trust' to use a secure (encrypted) connection (no certificate and hostname validation); "
-                                                                                + "'verify_ca' to use a secure (encrypted) connection but additionally verify the server TLS certificate against the configured Certificate Authority "
-                                                                                + "(CA) certificates, or fail if no valid matching CA certificates are found; or"
-                                                                                + "'verify-full' like 'verify-ca' but additionally verify that the server certificate matches the host to which the connection is attempted.")
+                                                                .setDescription("Whether to use an encrypted connection to SingleStore.\n"
+                                                                                + "Options include:\n"
+                                                                                + " * 'disable' to use an unencrypted connection (the default);\n"
+                                                                                + " * 'trust' to use a secure (encrypted) connection (no certificate and hostname validation);\n"
+                                                                                + " * 'verify_ca' to use a secure (encrypted) connection but additionally verify the server TLS certificate against the configured Certificate Authority "
+                                                                                + "(CA) certificates, or fail if no valid matching CA certificates are found;\n"
+                                                                                + " * 'verify-full' like 'verify-ca' but additionally verify that the server certificate matches the host to which the connection is attempted.")
                                                                 .setDropdownField(DropdownField
                                                                                 .newBuilder()
                                                                                 .addDropdownField(
