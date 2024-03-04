@@ -8,10 +8,6 @@ public class SingleStoreConfiguration {
     private final String user;
     private final String password;
     private final String sslMode;
-    private final String sslKeystore;
-    private final String sslKeystorePassword;
-    private final String sslTruststore;
-    private final String sslTruststorePassword;
     private final String sslServerCert;
     private final String driverParameters;
 
@@ -21,10 +17,6 @@ public class SingleStoreConfiguration {
         this.user = conf.get("user");
         this.password = conf.get("password");
         this.sslMode = conf.get("ssl.mode");
-        this.sslKeystore = conf.get("ssl.keystore");
-        this.sslKeystorePassword = conf.get("ssl.keystore.password");
-        this.sslTruststore = conf.get("ssl.truststore");
-        this.sslTruststorePassword = conf.get("ssl.truststore.password");
         this.sslServerCert = conf.get("ssl.server.cert");
         this.driverParameters = conf.get("driverParameters");
     }
@@ -47,22 +39,6 @@ public class SingleStoreConfiguration {
 
     public String sslMode() {
         return sslMode;
-    }
-
-    public String sslKeystore() {
-        return sslKeystore;
-    }
-
-    public String sslKeystorePassword() {
-        return sslKeystorePassword;
-    }
-
-    public String sslTruststore() {
-        return sslTruststore;
-    }
-
-    public String sslTruststorePassword() {
-        return sslTruststorePassword;
     }
 
     public String sslServerCert() {
