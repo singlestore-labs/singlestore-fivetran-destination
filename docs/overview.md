@@ -1,33 +1,33 @@
 ---
 name: SingleStore
-title: Fivetran for SingleStore | Configuration and documentation
-description: Connect data sources to SingleStore in minutes using Fivetran. Explore documentation and start syncing your applications, databases, and events.
+title: Fivetran for SingleStore | Configuration and Documentation
+description: Connect your data sources to SingleStore using Fivetran in just minutes. Explore our documentation and start syncing your applications, databases, and events.
 ---
 
 # SingleStore {% badge text="Partner-Built" /%} {% badge text="Private Preview" /%}
 
 
-[SingleStore](https://www.singlestore.com/) is a distributed database. It provides real-time analytics, transactions, and streaming capabilities, enabling users to handle diverse workloads on a single platform. 
+[SingleStore](https://www.singlestore.com/) is a distributed, cloud-native database that can handle transactional and analytical workloads with a unified engine. It provides real-time analytics, transactions, and streaming capabilities, enabling users to handle diverse workloads on a single platform. 
 
 You can use Fivetran, to ingest data from various sources into SingleStore for unified analytics and insights. 
 
-> NOTE: This destination is [partner-built](/docs/partner-built-program). For any questions related to SingleStore destination and its documentation, contact SingleStore by raising an issue in the connectors [GitHub repository](https://github.com/singlestore-labs/singlestore-fivetran-destination).
+> NOTE: This destination is [partner-built](/docs/partner-built-program). For any questions related to SingleStore destination and its documentation, contact SingleStore by raising an issue in the [SingleStore Fivetran Destination](https://github.com/singlestore-labs/singlestore-fivetran-destination) GitHub repository.
 
 ----
 
-## Setup guide
+## Setup Guide
 
-Follow our [step-by-step SingoeStore setup guide](/docs/destinations/singlestore/setup-guide) to connect SingleStore to Fivetran.
+Follow our step-by-step [SingleStore Setup Guide](/docs/destinations/singlestore/setup-guide) to connect SingleStore to Fivetran.
 
 ----
 
-## Type transformation mapping
+## Type Transformation Mapping
 
-As we extract your data, we match Fivetran data types to types that SingleStore supports. If we don't support a specific data type, we automatically change that type to the closest supported data type.
+While extracting data from your data source using Fivetran, SingleStore matches Fivetran data types to SingleStore data types. If a data type isn't supported, it is automatically typecasted to the closest supported SingleStore data type.
 
-The following table illustrates how we transform your Fivetran data types into SingleStore-supported types:
+The following table illustrates how Fivetran data types are transformed into SingleStore supported types:
 
-| FIVETRAN DATA TYPE | SingleStore DATA TYPE      |
+| Fivetran Data Type | SingleStore Data Type      |
 |--------------------|----------------------------|
 | BOOLEAN            | BOOLEAN                    |
 | SHORT              | SMALLINT                   |
@@ -46,10 +46,10 @@ The following table illustrates how we transform your Fivetran data types into S
 
 ----
 
-## Schema changes
+## Schema Changes
 
-| SCHEMA CHANGE      | SUPPORTED | NOTES                                                                                                     |
+| Schema Change      | Supported | Notes                                                                                                     |
 |--------------------|-----------|-----------------------------------------------------------------------------------------------------------|
-| Add column         | Yes       | When Fivetran detects a column being added to your source, Fivetran automatically adds that column in SingleStore. |
-| Change column type | Yes       | When Fivetran detects a column type change, Fivetran automatically changes column in SingleStore. To perform it, fake column is created, data is copied, old column is deleted and a new one is renamed. |
+| Add column         | ✔       | When Fivetran detects the addition of a column in your source, it automatically adds that column in SingleStore. |
+| Change column type | ✔       | When Fivetran detects a change in the column type in the data source, it automatically changes column type in SingleStore. To change the column type, Fivetran creates a new column, copies the data from the existing column to the new column, deletes the existing column, and renames the new column. |
 ---
