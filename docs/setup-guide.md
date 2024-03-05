@@ -45,17 +45,17 @@ To deploy a Self-Managed cluster instead, refer to [Deploy](https://docs.singles
 1. Log in to your Fivetran account.
 2. Go to the [**Destinations** page](https://fivetran.com/dashboard/destinations), and then click **+ Add Destination**.
 3. Enter a **Destination name** for your destination, and then click **Add**.
-5. Select **SingleStore** as the destination type.
-6. Enter the following connection configurations for you SingleStore workspace/cluster:
+4. Select **SingleStore** as the destination type.
+5. Enter the following connection configurations for you SingleStore workspace/cluster:
     * **Host**
     * **Port**
     * **Username**
     * **Password**
-10. (Optional) Enable SSL and specify related configurations.
-11. (Optional) Specify additional **Driver Parameters**. Refer to [The SingleStore JDBC Driver](https://docs.singlestore.com/cloud/developer-resources/connect-with-application-development-tools/connect-with-java-jdbc/the-singlestore-jdbc-driver/#connection-string-parameters) for a list of supported parameters.
-12. Select the **Data processing location**.
-13. Select your **Time zone**.
-14. Click **Save & Test**.
+6. (Optional) Enable SSL and specify related configurations.
+7. (Optional) Specify additional **Driver Parameters**. Refer to [The SingleStore JDBC Driver](https://docs.singlestore.com/cloud/developer-resources/connect-with-application-development-tools/connect-with-java-jdbc/the-singlestore-jdbc-driver/#connection-string-parameters) for a list of supported parameters.
+8. Select the **Data processing location**.
+9. Select your **Time zone**.
+10. Click **Save & Test**.
 
 Fivetran [tests and validates](/docs/destinations/singlestore/setup-guide#setuptest) the SingleStore connection configuration. Once the connection configuration test is successful, you can sync your data using Fivetran connectors to the SingleStore destination.
 
