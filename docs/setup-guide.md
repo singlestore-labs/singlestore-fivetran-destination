@@ -45,7 +45,6 @@ To deploy a Self-Managed cluster instead, refer to [Deploy](https://docs.singles
 1. Log in to your Fivetran account.
 2. Go to the [**Destinations** page](https://fivetran.com/dashboard/destinations), and then click **+ Add Destination**.
 3. Enter a **Destination name** for your destination, and then click **Add**.
-4. Click **Add**.
 5. Select **SingleStore** as the destination type.
 6. Enter the following connection configurations for you SingleStore workspace/cluster:
     * **Host**
