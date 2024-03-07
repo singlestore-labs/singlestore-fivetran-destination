@@ -21,7 +21,7 @@ To deploy a Self-Managed cluster instead, refer to [Deploy](https://docs.singles
     - `Port`: Default is `3306`
     - `Username`: Username of the SingleStore database user
     - `Password`: Password of the SingleStore database user    
-- A Fivetran account with [permission to add destinations](/docs/using-fivetran/fivetran-dashboard/account-management/role-based-access-control#legacyandnewrbacmodel).
+- A Fivetran account with the [Create Destinations or Manage Destinations](/docs/using-fivetran/fivetran-dashboard/account-management/role-based-access-control#rbacpermissions) permissions.
 
 
 ---
@@ -40,7 +40,7 @@ To deploy a Self-Managed cluster instead, refer to [Deploy](https://docs.singles
     * `ALTER`
     * `CREATE DATABASE`
 
-### <span class="step-item">Configure Fivetran </span>
+### <span class="step-item">Complete Fivetran configuration</span>
 
 1. Log in to your Fivetran account.
 2. Go to the [**Destinations** page](https://fivetran.com/dashboard/destinations), and then click **+ Add Destination**.
@@ -52,7 +52,7 @@ To deploy a Self-Managed cluster instead, refer to [Deploy](https://docs.singles
     * **Username**
     * **Password**
 6. (Optional) Enable SSL and specify related configurations.
-7. (Optional) Specify additional **Driver Parameters**. Refer to [The SingleStore JDBC Driver](https://docs.singlestore.com/cloud/developer-resources/connect-with-application-development-tools/connect-with-java-jdbc/the-singlestore-jdbc-driver/#connection-string-parameters) for a list of supported parameters.
+7. (Optional) Specify additional **Driver Parameters**. Refer to [The SingleStore JDBC Driver](https://docs.singlestore.com/cloud/developer-resources/connect-with-application-development-tools/connect-with-java-jdbc/the-singlestore-jdbc-driver/#connection-string-parameters) documentation for a list of supported parameters.
 8. Select the **Data processing location**.
 9. Select your **Time zone**.
 10. Click **Save & Test**.

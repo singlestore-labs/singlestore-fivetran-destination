@@ -181,8 +181,16 @@ public class JDBCUtil {
             Column oldColumn = oldColumns.get(column.getName());
             if (oldColumn == null) {
                 columnsToAdd.add(column);
-            } else if (!oldColumn.equals(column)) {
-                columnsToChange.add(column);
+            } else {
+                String oldType = mapDataTypes(oldColumn.getType(), oldColumn.getDecimal());
+                String newType = mapDataTypes(column.getType(), column.getDecimal());
+                if (!oldType.equals(newType)) {
+                    if (oldColumn.getPrimaryKey()) {
+                        throw new Exception(
+                                "Changing PRIMARY KEY column data type is not supported in SingleStore");
+                    }
+                    columnsToChange.add(column);
+                }
             }
         }
 
