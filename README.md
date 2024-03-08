@@ -1,5 +1,7 @@
 # SingleStore Fivetran Destination
 
+**Attention**: The code in this repository is intended for experimental use only and is not fully tested, documented, or supported by SingleStore. Visit the [SingleStore Forums](https://www.singlestore.com/forum/) to ask questions about this repository.
+
 ## Pre-requisites for development
 - JDK v17
 - Gradle 8 ([here](https://gradle.org/install/#manually) is an installation instruction)
