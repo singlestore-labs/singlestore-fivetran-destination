@@ -117,6 +117,11 @@ public class LoadDataWriter extends Writer {
 
     @Override
     public void commit() throws InterruptedException, IOException, SQLException {
+        if (t == null) {
+            // nothing is written
+            return;
+        }
+
         outputStream.close();
         t.join();
 
