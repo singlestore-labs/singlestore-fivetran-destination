@@ -42,5 +42,5 @@ create database tester;
 ```
 3. To run the tester follow instructions from [here](https://github.com/fivetran/fivetran_sdk/blob/main/tools/destination-tester/README.md). As a command use You can use
 ```
-docker run --mount type=bind,source=./data-folder,target=/data -a STDIN -a STDOUT -a STDERR -it -e WORKING_DIR=./data-folder -e GRPC_HOSTNAME=localhost --network=host sdk-destination-tester --plain-text
+docker run --mount type=bind,source=./data-folder,target=/data -a STDIN -a STDOUT -a STDERR -it -e WORKING_DIR=./data-folder -e GRPC_HOSTNAME=localhost --network=host fivetrandocker/sdk-destination-tester:024.0309.001
 ```
