@@ -58,8 +58,8 @@ public class LoadDataWriter extends Writer {
             columns.add(nameToColumn.get(name));
         }
 
-        List<Column> binaryColumns =
-                columns.stream().filter(column -> column.getType() == DataType.BINARY).toList();
+        List<Column> binaryColumns = columns.stream()
+                .filter(column -> column.getType() == DataType.BINARY).collect(Collectors.toList());
 
         // TODO: PLAT-6898 add compression
         String query = String.format(
