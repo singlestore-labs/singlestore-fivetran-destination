@@ -358,7 +358,7 @@ public class JDBCUtil {
                     stmt.setDouble(id, Double.parseDouble(value));
                     break;
                 case BINARY:
-                    stmt.setBytes(id, value.getBytes());
+                    stmt.setBytes(id, Base64.getDecoder().decode(value));
                     break;
 
                 case NAIVE_DATETIME:

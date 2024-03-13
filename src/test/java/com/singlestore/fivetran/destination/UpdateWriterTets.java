@@ -1,12 +1,18 @@
 package com.singlestore.fivetran.destination;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
-
+import com.singlestore.fivetran.destination.writers.DeleteWriter;
 import com.singlestore.fivetran.destination.writers.LoadDataWriter;
 import com.singlestore.fivetran.destination.writers.UpdateWriter;
 
@@ -29,20 +35,20 @@ public class UpdateWriterTets extends IntegrationTestBase {
                     "1000-01-01T00:00:00", "1000-01-01T00:00:00.000Z", "1970-01-01T00:00:01",
                     "1970-01-01T00:00:01.000Z", "1901",
                     "-12345678901234567890123456789012345.123456789012345678901234567891",
-                    "123456789", "123456789", "123456789", "a", "abc", "a", "abc", "abc", "abc",
-                    "abc", "abc", "abc", "abc", "abc", "abc", "{\"a\":\"b\"}",
+                    "123456789", "123456789", "123456789", "a", "abc", "YQ==", "abc", "YWJj", "abc",
+                    "abc", "abc", "YWJj", "YWJj", "YWJj", "YWJj", "{\"a\":\"b\"}",
                     "POLYGON((0 0, 0 1, 1 1, 0 0))", "POINT(-74.044514 40.689244)"));
             w.commit();
 
             UpdateWriter u = new UpdateWriter(conn, database, allTypesTable, params, null);
             u.setHeader(allTypesColumns);
-            u.writeRow(List.of("1", "TRUE", "true", "12345678", "127", "32767", "8388607",
+            u.writeRow(List.of("1", "TRUE", "true", "MTIzNDU2Nzg=", "127", "32767", "8388607",
                     "2147483647", "2147483647", "9223372036854775807", "100.1", "1000.01",
                     "1000.01", "9999-12-31", "830:00:00", "830:00:00.000000", "9999-12-31T23:59:59",
                     "9999-12-31T23:59:59.999Z", "2038-01-19T03:14:07", "2038-01-19T03:14:07.999Z",
                     "2155", "12345678901234567890123456789012345.123456789012345678901234567891",
-                    "123456789", "123456789", "123456789", "a", "abc", "a", "abc", "abc", "abc",
-                    "abc", "abc", "abc", "abc", "abc", "abc", "{\"a\":\"b\"}",
+                    "123456789", "123456789", "123456789", "a", "abc", "YQ==", "abc", "YWJj", "abc",
+                    "abc", "abc", "YWJj", "YWJj", "YWJj", "YWJj", "{\"a\":\"b\"}",
                     "POLYGON((0 0, 0 1, 1 1, 0 0))", "POINT(-74.044514 40.689244)"));
             u.commit();
         }
@@ -87,5 +93,38 @@ public class UpdateWriterTets extends IntegrationTestBase {
         checkResult("SELECT * FROM `partialUpdate` ORDER BY id",
                 Arrays.asList(Arrays.asList("1", "2", "3"), Arrays.asList("4", "5", "1"),
                         Arrays.asList("7", "10", "9"), Arrays.asList("10", "11", "12")));
+    }
+
+    @Test
+    public void allBytes() throws Exception {
+        byte[] data = new byte[256];
+        for (int i = 0; i < 256; i++) {
+            data[i] = (byte) i;
+        }
+
+        String dataBase64 = Base64.getEncoder().encodeToString(data);
+        try (Connection conn = JDBCUtil.createConnection(conf);
+                Statement stmt = conn.createStatement();) {
+            stmt.execute(String.format("USE %s", database));
+            stmt.executeQuery("CREATE TABLE allBytes(a BLOB PRIMARY KEY, b INT)");
+            Table allBytesTable = JDBCUtil.getTable(conf, database, "allBytes");
+            CsvFileParams params = CsvFileParams.newBuilder().setNullString("NULL").build();
+            LoadDataWriter w = new LoadDataWriter(conn, database, allBytesTable, params, null);
+            w.setHeader(List.of("a", "b"));
+            w.writeRow(List.of(dataBase64, "1"));
+            w.commit();
+
+            UpdateWriter u = new UpdateWriter(conn, database, allBytesTable, params, null);
+            u.setHeader(List.of("a", "b"));
+            u.writeRow(List.of(dataBase64, "2"));
+            u.commit();
+
+            try (ResultSet rs = stmt.executeQuery("SELECT * FROM allBytes")) {
+                assertTrue(rs.next());
+                assertArrayEquals(data, rs.getBytes(1));
+                assertEquals(2, rs.getInt(2));
+                assertFalse(rs.next());
+            }
+        }
     }
 }

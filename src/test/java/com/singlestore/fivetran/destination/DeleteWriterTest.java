@@ -5,6 +5,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -110,8 +111,8 @@ public class DeleteWriterTest extends IntegrationTestBase {
                     "1000-01-01T00:00:00", "1000-01-01T00:00:00.000Z", "1970-01-01T00:00:01",
                     "1970-01-01T00:00:01.000Z", "1901",
                     "-12345678901234567890123456789012345.123456789012345678901234567891",
-                    "123456789", "123456789", "123456789", "a", "abc", "a", "abc", "abc", "abc",
-                    "abc", "abc", "abc", "abc", "abc", "abc", "{\"a\":\"b\"}",
+                    "123456789", "123456789", "123456789", "a", "abc", "YQ==", "abc", "YWJj", "abc",
+                    "abc", "abc", "YWJj", "YWJj", "YWJj", "YWJj", "{\"a\":\"b\"}",
                     "POLYGON((0 0, 0 1, 1 1, 0 0))", "POINT(-74.044514 40.689244)"));
             w.commit();
 
@@ -123,8 +124,8 @@ public class DeleteWriterTest extends IntegrationTestBase {
                     "1000-01-01T00:00:00", "1000-01-01T00:00:00.000Z", "1970-01-01T00:00:01",
                     "1970-01-01T00:00:01.000Z", "1901",
                     "-12345678901234567890123456789012345.123456789012345678901234567891",
-                    "123456789", "123456789", "123456789", "a", "abc", "a", "abc", "abc", "abc",
-                    "abc", "abc", "abc", "abc", "abc", "abc", "{\"a\":\"b\"}",
+                    "123456789", "123456789", "123456789", "a", "abc", "YQ==", "abc", "YWJj", "abc",
+                    "abc", "abc", "YWJj", "YWJj", "YWJj", "YWJj", "{\"a\":\"b\"}",
                     "POLYGON((0 0, 0 1, 1 1, 0 0))", "POINT(-74.044514 40.689244)"));
             d.commit();
         }
@@ -189,5 +190,33 @@ public class DeleteWriterTest extends IntegrationTestBase {
         }
 
         checkResult("SELECT * FROM `bigDelete` ORDER BY id", res);
+    }
+
+    @Test
+    public void allBytes() throws Exception {
+        byte[] data = new byte[256];
+        for (int i = 0; i < 256; i++) {
+            data[i] = (byte) i;
+        }
+
+        String dataBase64 = Base64.getEncoder().encodeToString(data);
+        try (Connection conn = JDBCUtil.createConnection(conf);
+                Statement stmt = conn.createStatement();) {
+            stmt.execute(String.format("USE %s", database));
+            stmt.executeQuery("CREATE TABLE allBytes(a BLOB PRIMARY KEY)");
+            Table allBytesTable = JDBCUtil.getTable(conf, database, "allBytes");
+            CsvFileParams params = CsvFileParams.newBuilder().setNullString("NULL").build();
+            LoadDataWriter w = new LoadDataWriter(conn, database, allBytesTable, params, null);
+            w.setHeader(List.of("a"));
+            w.writeRow(List.of(dataBase64));
+            w.commit();
+
+            DeleteWriter d = new DeleteWriter(conn, database, allBytesTable, params, null);
+            d.setHeader(List.of("a"));
+            d.writeRow(List.of(dataBase64));
+            d.commit();
+        }
+
+        checkResult("SELECT * FROM `allBytes`", Arrays.asList());
     }
 }
