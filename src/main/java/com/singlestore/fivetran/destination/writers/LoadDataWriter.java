@@ -11,10 +11,12 @@ import fivetran_sdk.Table;
 import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +43,10 @@ public class LoadDataWriter extends Writer {
         super(conn, database, table, params, secretKeys);
     }
 
+    private String tmpColumnName(String name) {
+        return String.format("@%s", name);
+    }
+
     @Override
     public void setHeader(List<String> header) throws SQLException {
         Map<String, Column> nameToColumn = new HashMap<>();
@@ -52,12 +58,24 @@ public class LoadDataWriter extends Writer {
             columns.add(nameToColumn.get(name));
         }
 
+        List<Column> binaryColumns = columns.stream()
+                .filter(column -> column.getType() == DataType.BINARY).collect(Collectors.toList());
+
         // TODO: PLAT-6898 add compression
         String query = String.format(
-                "LOAD DATA LOCAL INFILE '###.tsv' REPLACE INTO TABLE %s (%s) NULL DEFINED BY %s",
-                JDBCUtil.escapeTable(database, table.getName()),
-                header.stream().map(JDBCUtil::escapeIdentifier).collect(Collectors.joining(", ")),
-                JDBCUtil.escapeString(params.getNullString()));
+                "LOAD DATA LOCAL INFILE '###.tsv' REPLACE INTO TABLE %s (%s) NULL DEFINED BY %s %s",
+                JDBCUtil.escapeTable(database, table.getName()), columns.stream().map(c -> {
+                    String escapedName = JDBCUtil.escapeIdentifier(c.getName());
+                    if (c.getType() == DataType.BINARY) {
+                        return tmpColumnName(escapedName);
+                    }
+                    return escapedName;
+                }).collect(Collectors.joining(", ")), JDBCUtil.escapeString(params.getNullString()),
+                binaryColumns.isEmpty() ? "" : "SET " + binaryColumns.stream().map(column -> {
+                    String escapedName = JDBCUtil.escapeIdentifier(column.getName());
+                    return String.format("%s = FROM_BASE64(%s)", escapedName,
+                            tmpColumnName(escapedName));
+                }).collect(Collectors.joining(", ")));
 
         stmt = conn.createStatement();
         ((com.singlestore.jdbc.Statement) stmt).setNextLocalInfileInputStream(inputStream);
