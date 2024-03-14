@@ -67,7 +67,7 @@
             }
         },
         {
-            "hard_truncate_before": [
+            "truncate_before": [
                 "campaign"
             ]
         },
@@ -82,7 +82,7 @@
             }
         },
         {
-            "truncate_before": [
+            "soft_truncate_before": [
                 "transaction"
             ]
         },
@@ -114,15 +114,23 @@
                 "transaction": [
                     {
                         "id": 3
-                    },
-                    {
-                        "id": 4
                     }
                 ],
                 "campaign": [
                     {
                         "_fivetran_id": "abc-123-xyz"
-                    },
+                    }
+                ]
+            }
+        },
+        {
+            "soft_delete": {
+                "transaction": [
+                    {
+                        "id": 4
+                    }
+                ],
+                "campaign": [
                     {
                         "_fivetran_id": "dfg-890-lkj"
                     }
