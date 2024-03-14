@@ -214,7 +214,7 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
 
         try (Connection conn = JDBCUtil.createConnection(conf);) {
             if (request.getTable().getColumnsList().stream()
-                    .allMatch(column -> !column.getPrimaryKey())) {
+                    .noneMatch(column -> column.getPrimaryKey())) {
                 throw new Exception("No primary key found");
             }
 
