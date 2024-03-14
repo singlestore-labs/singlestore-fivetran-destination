@@ -213,6 +213,11 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
         SingleStoreConfiguration conf = new SingleStoreConfiguration(request.getConfigurationMap());
 
         try (Connection conn = JDBCUtil.createConnection(conf);) {
+            if (request.getTable().getColumnsList().stream()
+                    .allMatch(column -> !column.getPrimaryKey())) {
+                throw new Exception("No primary key found");
+            }
+
             LoadDataWriter w = new LoadDataWriter(conn, request.getSchemaName(), request.getTable(),
                     request.getCsv(), request.getKeysMap());
             for (String file : request.getReplaceFilesList()) {
