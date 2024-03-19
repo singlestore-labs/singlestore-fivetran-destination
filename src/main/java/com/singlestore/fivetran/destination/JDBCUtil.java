@@ -20,6 +20,10 @@ public class JDBCUtil {
         connectionProps.put("allowLocalInfile", "true");
         connectionProps.put("transformedBitIsBoolean", "true");
         connectionProps.put("allowMultiQueries", "true");
+        connectionProps.put("connectionAttributes",
+                String.format("_connector_name:%s,_connector_version:%s",
+                        "SingleStore Fivetran Destination", VersionProvider.getVersion()));
+
         if (conf.sslMode() != null) {
             connectionProps.put("sslMode", conf.sslMode());
             if (!conf.sslMode().equals("disable")) {
