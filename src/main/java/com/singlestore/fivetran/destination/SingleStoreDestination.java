@@ -40,7 +40,9 @@ public class SingleStoreDestination {
             throw e;
         }
 
-        logger.info(String.format("Starting Destination gRPC server which listens port %d", port));
+        logger.info(
+                String.format("Starting Destination gRPC server (version %s) which listens port %d",
+                        VersionProvider.getVersion(), port));
         Server server = ServerBuilder.forPort(port)
                 .addService(new SingleStoreDestinationServiceImpl()).build();
 
