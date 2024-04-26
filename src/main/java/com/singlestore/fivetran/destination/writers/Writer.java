@@ -3,10 +3,7 @@ package com.singlestore.fivetran.destination.writers;
 import com.github.luben.zstd.ZstdInputStream;
 import com.google.protobuf.ByteString;
 import com.opencsv.CSVReader;
-import fivetran_sdk.Compression;
-import fivetran_sdk.CsvFileParams;
-import fivetran_sdk.Encryption;
-import fivetran_sdk.Table;
+import fivetran_sdk.*;
 
 import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
@@ -26,14 +23,16 @@ abstract public class Writer {
 
     Connection conn;
     String database;
-    Table table;
+    String table;
+    List<Column> columns;
     CsvFileParams params;
     Map<String, ByteString> secretKeys;
 
-    public Writer(Connection conn, String database, Table table, CsvFileParams params,
+    public Writer(Connection conn, String database, String table, List<Column> columns, CsvFileParams params,
             Map<String, ByteString> secretKeys) {
         this.conn = conn;
         this.database = database;
+        this.columns = columns;
         this.table = table;
         this.params = params;
         this.secretKeys = secretKeys;

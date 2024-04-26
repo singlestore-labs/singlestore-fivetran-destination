@@ -31,16 +31,16 @@ public class LoadDataWriter extends Writer {
 
     final int BUFFER_SIZE = 524288;
 
-    List<Column> columns = new ArrayList<>();
+    List<Column> headerColumns = new ArrayList<>();
     PipedOutputStream outputStream = new PipedOutputStream();
     PipedInputStream inputStream = new PipedInputStream(outputStream, BUFFER_SIZE);
     Thread t;
     final SQLException[] queryException = new SQLException[1];
     Statement stmt;
 
-    public LoadDataWriter(Connection conn, String database, Table table, CsvFileParams params,
+    public LoadDataWriter(Connection conn, String database, String table, List<Column> columns, CsvFileParams params,
             Map<String, ByteString> secretKeys) throws IOException {
-        super(conn, database, table, params, secretKeys);
+        super(conn, database, table, columns, params, secretKeys);
     }
 
     private String tmpColumnName(String name) {
@@ -50,21 +50,21 @@ public class LoadDataWriter extends Writer {
     @Override
     public void setHeader(List<String> header) throws SQLException {
         Map<String, Column> nameToColumn = new HashMap<>();
-        for (Column column : table.getColumnsList()) {
+        for (Column column : columns) {
             nameToColumn.put(column.getName(), column);
         }
 
         for (String name : header) {
-            columns.add(nameToColumn.get(name));
+            headerColumns.add(nameToColumn.get(name));
         }
 
-        List<Column> binaryColumns = columns.stream()
+        List<Column> binaryColumns = headerColumns.stream()
                 .filter(column -> column.getType() == DataType.BINARY).collect(Collectors.toList());
 
         // TODO: PLAT-6898 add compression
         String query = String.format(
                 "LOAD DATA LOCAL INFILE '###.tsv' REPLACE INTO TABLE %s (%s) NULL DEFINED BY %s %s",
-                JDBCUtil.escapeTable(database, table.getName()), columns.stream().map(c -> {
+                JDBCUtil.escapeTable(database, table), headerColumns.stream().map(c -> {
                     String escapedName = JDBCUtil.escapeIdentifier(c.getName());
                     if (c.getType() == DataType.BINARY) {
                         return tmpColumnName(escapedName);
@@ -98,7 +98,7 @@ public class LoadDataWriter extends Writer {
             for (int i = 0; i < row.size(); i++) {
                 String value = row.get(i);
 
-                DataType type = columns.get(i).getType();
+                DataType type = headerColumns.get(i).getType();
                 if (type == DataType.BOOLEAN) {
                     if (value.equalsIgnoreCase("true")) {
                         value = "1";

@@ -26,6 +26,14 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
                                 .setTextField(TextField.PlainText).build(),
                         FormField.newBuilder().setName("port").setLabel("Port").setRequired(true)
                                 .setTextField(TextField.PlainText).build(),
+                        FormField.newBuilder().setName("database").setLabel("Database").setRequired(false)
+                                .setDescription(
+                                        "SingleStore database in which data should be written.\n" +
+                                                "If this option is specified, data will be written to a single database.\n" +
+                                                "Each table name will consist of Fivetran schema name and table name (For example: `<schema>_<table>`).\n" +
+                                                "If this option is not specified, appropriate SingleStore database will be created for each schema.\n" +
+                                                "'CREATE DATABASE' permissions are required in this case.")
+                                .setTextField(TextField.PlainText).build(),
                         FormField.newBuilder().setName("user").setLabel("Username")
                                 .setRequired(true).setTextField(TextField.PlainText).build(),
                         FormField.newBuilder().setName("password").setLabel("Password")
@@ -93,11 +101,11 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
     public void describeTable(DescribeTableRequest request,
             StreamObserver<DescribeTableResponse> responseObserver) {
         SingleStoreConfiguration conf = new SingleStoreConfiguration(request.getConfigurationMap());
-        String database = request.getSchemaName();
-        String table = request.getTableName();
+        String database = JDBCUtil.getDatabaseName(conf, request.getSchemaName());
+        String table = JDBCUtil.getTableName(conf, request.getSchemaName(), request.getTableName());
 
         try {
-            Table t = JDBCUtil.getTable(conf, database, table);
+            Table t = JDBCUtil.getTable(conf, database, table, table);
 
             DescribeTableResponse response = DescribeTableResponse.newBuilder().setTable(t).build();
 
@@ -127,18 +135,21 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
             StreamObserver<CreateTableResponse> responseObserver) {
         SingleStoreConfiguration conf = new SingleStoreConfiguration(request.getConfigurationMap());
 
-        String query = JDBCUtil.generateCreateTableQuery(request);
         try (Connection conn = JDBCUtil.createConnection(conf);
                 Statement stmt = conn.createStatement()) {
+            String query = JDBCUtil.generateCreateTableQuery(conf, stmt, request);
             logger.info(String.format("Executing SQL:\n %s", query));
             stmt.execute(query);
 
             responseObserver.onNext(CreateTableResponse.newBuilder().setSuccess(true).build());
             responseObserver.onCompleted();
         } catch (Exception e) {
+            String database = JDBCUtil.getDatabaseName(conf, request.getSchemaName());
+            String table = JDBCUtil.getTableName(conf, request.getSchemaName(), request.getTable().getName());
+
             logger.warn(
                     String.format("CreateTable failed for %s", JDBCUtil
-                            .escapeTable(request.getSchemaName(), request.getTable().getName())),
+                            .escapeTable(database, table)),
                     e);
 
             responseObserver.onNext(CreateTableResponse.newBuilder().setSuccess(false)
@@ -164,9 +175,11 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
             responseObserver.onNext(AlterTableResponse.newBuilder().setSuccess(true).build());
             responseObserver.onCompleted();
         } catch (Exception e) {
+            String database = JDBCUtil.getDatabaseName(conf, request.getSchemaName());
+            String table = JDBCUtil.getTableName(conf, request.getSchemaName(), request.getTable().getName());
             logger.warn(
                     String.format("AlterTable failed for %s", JDBCUtil
-                            .escapeTable(request.getSchemaName(), request.getTable().getName())),
+                            .escapeTable(database, table)),
                     e);
 
             responseObserver.onNext(AlterTableResponse.newBuilder().setSuccess(false)
@@ -179,27 +192,28 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
     public void truncate(TruncateRequest request,
             StreamObserver<TruncateResponse> responseObserver) {
         SingleStoreConfiguration conf = new SingleStoreConfiguration(request.getConfigurationMap());
+        String database = JDBCUtil.getDatabaseName(conf, request.getSchemaName());
+        String table = JDBCUtil.getTableName(conf, request.getSchemaName(), request.getTableName());
 
         try (Connection conn = JDBCUtil.createConnection(conf);
                 Statement stmt = conn.createStatement()) {
-            if (!JDBCUtil.checkTableExists(stmt, request.getSchemaName(), request.getTableName())) {
+            if (!JDBCUtil.checkTableExists(stmt, database, table)) {
                 logger.warn(String.format("Table %s doesn't exist",
-                        JDBCUtil.escapeTable(request.getSchemaName(), request.getTableName())));
+                        JDBCUtil.escapeTable(database, table)));
                 responseObserver.onNext(TruncateResponse.newBuilder().setSuccess(true).build());
                 responseObserver.onCompleted();
                 return;
             }
 
-            String query = JDBCUtil.generateTruncateTableQuery(request);
+            String query = JDBCUtil.generateTruncateTableQuery(conf, request);
             logger.info(String.format("Executing SQL:\n %s", query));
             stmt.execute(query);
 
             responseObserver.onNext(TruncateResponse.newBuilder().setSuccess(true).build());
             responseObserver.onCompleted();
         } catch (Exception e) {
-            if (e.getMessage().matches(""))
-                logger.warn(String.format("TruncateTable failed for %s",
-                        JDBCUtil.escapeTable(request.getSchemaName(), request.getTableName())), e);
+            logger.warn(String.format("TruncateTable failed for %s",
+                    JDBCUtil.escapeTable(database, table)), e);
 
             responseObserver.onNext(TruncateResponse.newBuilder().setSuccess(false)
                     .setFailure(e.getMessage()).build());
@@ -211,6 +225,8 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
     public void writeBatch(WriteBatchRequest request,
             StreamObserver<WriteBatchResponse> responseObserver) {
         SingleStoreConfiguration conf = new SingleStoreConfiguration(request.getConfigurationMap());
+        String database = JDBCUtil.getDatabaseName(conf, request.getSchemaName());
+        String table = JDBCUtil.getTableName(conf, request.getSchemaName(), request.getTable().getName());
 
         try (Connection conn = JDBCUtil.createConnection(conf);) {
             if (request.getTable().getColumnsList().stream()
@@ -218,14 +234,14 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
                 throw new Exception("No primary key found");
             }
 
-            LoadDataWriter w = new LoadDataWriter(conn, request.getSchemaName(), request.getTable(),
+            LoadDataWriter w = new LoadDataWriter(conn, database, table, request.getTable().getColumnsList(),
                     request.getCsv(), request.getKeysMap());
             for (String file : request.getReplaceFilesList()) {
                 w.write(file);
             }
             w.commit();
 
-            UpdateWriter u = new UpdateWriter(conn, request.getSchemaName(), request.getTable(),
+            UpdateWriter u = new UpdateWriter(conn, database, table, request.getTable().getColumnsList(),
                     request.getCsv(), request.getKeysMap());
             for (String file : request.getUpdateFilesList()) {
                 u.write(file);
@@ -233,7 +249,7 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
             u.commit();
 
 
-            DeleteWriter d = new DeleteWriter(conn, request.getSchemaName(), request.getTable(),
+            DeleteWriter d = new DeleteWriter(conn, database, table, request.getTable().getColumnsList(),
                     request.getCsv(), request.getKeysMap());
             for (String file : request.getDeleteFilesList()) {
                 d.write(file);
@@ -245,7 +261,7 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
         } catch (Exception e) {
             logger.warn(
                     String.format("WriteBatch failed for %s", JDBCUtil
-                            .escapeTable(request.getSchemaName(), request.getTable().getName())),
+                            .escapeTable(database, table)),
                     e);
 
             responseObserver.onNext(WriteBatchResponse.newBuilder().setSuccess(false)

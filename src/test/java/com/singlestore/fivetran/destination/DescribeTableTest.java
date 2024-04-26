@@ -18,7 +18,7 @@ public class DescribeTableTest extends IntegrationTestBase {
         createAllTypesTable();
 
         try (Connection conn = JDBCUtil.createConnection(conf)) {
-            Table allTypesTable = JDBCUtil.getTable(conf, database, "allTypesTable");
+            Table allTypesTable = JDBCUtil.getTable(conf, database, "allTypesTable", "allTypesTable");
             assertEquals("allTypesTable", allTypesTable.getName());
             List<Column> columns = allTypesTable.getColumnsList();
 
@@ -191,7 +191,7 @@ public class DescribeTableTest extends IntegrationTestBase {
             stmt.executeQuery(String.format("USE %s", database));
             stmt.executeQuery("CREATE TABLE scaleAndPrecision(" + "dec1 DECIMAL(38, 30), "
                     + "dec2 DECIMAL(10, 5)" + ")");
-            Table t = JDBCUtil.getTable(conf, database, "scaleAndPrecision");
+            Table t = JDBCUtil.getTable(conf, database, "scaleAndPrecision", "scaleAndPrecision");
             assertEquals("scaleAndPrecision", t.getName());
             List<Column> columns = t.getColumnsList();
 

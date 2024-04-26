@@ -38,7 +38,7 @@ To deploy a Self-Managed cluster instead, refer to [Deploy](https://docs.singles
     * `DELETE`
     * `CREATE`
     * `ALTER`
-    * `CREATE DATABASE`
+    * `CREATE DATABASE` (if `database` configuration is not specified)
 
 ### <span class="step-item">Complete Fivetran configuration</span>
 
@@ -51,11 +51,12 @@ To deploy a Self-Managed cluster instead, refer to [Deploy](https://docs.singles
     * **Port**
     * **Username**
     * **Password**
-6. (Optional) Enable SSL and specify related configurations.
-7. (Optional) Specify additional **Driver Parameters**. Refer to [The SingleStore JDBC Driver](https://docs.singlestore.com/cloud/developer-resources/connect-with-application-development-tools/connect-with-java-jdbc/the-singlestore-jdbc-driver/#connection-string-parameters) documentation for a list of supported parameters.
-8. Select the **Data processing location**.
-9. Select your **Time zone**.
-10. Click **Save & Test**.
+6. (Optional) Enter a **Database** configuration if you want all tables to be created in a single database.
+7. (Optional) Enable SSL and specify related configurations.
+8. (Optional) Specify additional **Driver Parameters**. Refer to [The SingleStore JDBC Driver](https://docs.singlestore.com/cloud/developer-resources/connect-with-application-development-tools/connect-with-java-jdbc/the-singlestore-jdbc-driver/#connection-string-parameters) documentation for a list of supported parameters.
+9. Select the **Data processing location**.
+10. Select your **Time zone**.
+11. Click **Save & Test**.
 
 Fivetran [tests and validates](/docs/destinations/singlestore/setup-guide#setuptest) the SingleStore connection configuration. Once the connection configuration test is successful, you can sync your data using Fivetran connectors to the SingleStore destination.
 

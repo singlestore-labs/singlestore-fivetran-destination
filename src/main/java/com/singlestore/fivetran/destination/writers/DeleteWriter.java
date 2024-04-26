@@ -22,15 +22,15 @@ public class DeleteWriter extends Writer {
     List<Column> pkColumns = new ArrayList<>();
     List<List<String>> batch = new ArrayList<>();
 
-    public DeleteWriter(Connection conn, String database, Table table, CsvFileParams params,
+    public DeleteWriter(Connection conn, String database, String table, List<Column> columns, CsvFileParams params,
             Map<String, ByteString> secretKeys) {
-        super(conn, database, table, params, secretKeys);
+        super(conn, database, table, columns, params, secretKeys);
     }
 
     @Override
     public void setHeader(List<String> header) {
         Map<String, Column> nameToColumn = new HashMap<>();
-        for (Column column : table.getColumnsList()) {
+        for (Column column : columns) {
             if (column.getPrimaryKey()) {
                 nameToColumn.put(column.getName(), column);
             }
@@ -59,7 +59,7 @@ public class DeleteWriter extends Writer {
         }
 
         StringBuilder query = new StringBuilder(String.format("DELETE FROM %s WHERE ",
-                JDBCUtil.escapeTable(database, table.getName())));
+                JDBCUtil.escapeTable(database, table)));
 
         String condition = pkColumns.stream()
                 .map(column -> String.format("%s = ?", JDBCUtil.escapeIdentifier(column.getName())))

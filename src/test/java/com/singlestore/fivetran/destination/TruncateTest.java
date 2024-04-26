@@ -31,7 +31,7 @@ public class TruncateTest extends IntegrationTestBase {
 
             CreateTableRequest cr =
                     CreateTableRequest.newBuilder().setSchemaName(database).setTable(t).build();
-            stmt.execute(JDBCUtil.generateCreateTableQuery(cr));
+            stmt.execute(JDBCUtil.generateCreateTableQuery(conf, stmt, cr));
 
             stmt.execute(String.format("USE %s", database));
             stmt.execute("INSERT INTO softTruncate VALUES (1, '2038-01-19 03:14:07.123455', 0)");
@@ -48,7 +48,7 @@ public class TruncateTest extends IntegrationTestBase {
                             Timestamp.newBuilder().setSeconds(2147483647L).setNanos(123458000))
                     .build();
 
-            stmt.execute(JDBCUtil.generateTruncateTableQuery(tr));
+            stmt.execute(JDBCUtil.generateTruncateTableQuery(conf, tr));
 
             checkResult("SELECT * FROM `softTruncate` ORDER BY a",
                     Arrays.asList(Arrays.asList("1", "2038-01-19 03:14:07.123455", "1"),
@@ -75,7 +75,7 @@ public class TruncateTest extends IntegrationTestBase {
 
             CreateTableRequest cr =
                     CreateTableRequest.newBuilder().setSchemaName(database).setTable(t).build();
-            stmt.execute(JDBCUtil.generateCreateTableQuery(cr));
+            stmt.execute(JDBCUtil.generateCreateTableQuery(conf, stmt, cr));
 
             stmt.execute(String.format("USE %s", database));
             stmt.execute("INSERT INTO hardTruncate VALUES (1, '2038-01-19 03:14:07.123455', 0)");
@@ -91,7 +91,7 @@ public class TruncateTest extends IntegrationTestBase {
                             Timestamp.newBuilder().setSeconds(2147483647L).setNanos(123458000))
                     .build();
 
-            stmt.execute(JDBCUtil.generateTruncateTableQuery(tr));
+            stmt.execute(JDBCUtil.generateTruncateTableQuery(conf, tr));
 
             checkResult("SELECT * FROM `hardTruncate` ORDER BY a",
                     Arrays.asList(Arrays.asList("5", "2038-01-19 03:14:07.123460", "0")));

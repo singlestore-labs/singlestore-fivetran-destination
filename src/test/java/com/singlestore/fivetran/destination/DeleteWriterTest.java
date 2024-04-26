@@ -100,10 +100,10 @@ public class DeleteWriterTest extends IntegrationTestBase {
                     "  )\n" + //
                     ") AUTOSTATS_CARDINALITY_MODE=PERIODIC AUTOSTATS_HISTOGRAM_MODE=CREATE SQL_MODE='STRICT_ALL_TABLES'");
 
-            Table allTypesTableBigKey = JDBCUtil.getTable(conf, database, "allTypesTableBigKey");
+            Table allTypesTableBigKey = JDBCUtil.getTable(conf, database, "allTypesTableBigKey", "allTypesTableBigKey");
             CsvFileParams params = CsvFileParams.newBuilder().setNullString("NULL").build();
             LoadDataWriter w =
-                    new LoadDataWriter(conn, database, allTypesTableBigKey, params, null);
+                    new LoadDataWriter(conn, database, allTypesTableBigKey.getName(), allTypesTableBigKey.getColumnsList(), params, null);
             w.setHeader(allTypesColumns);
             w.writeRow(List.of("1", "FALSE", "false", "", "-128", "-32768", "-8388608",
                     "-2147483648", "-2147483648", "-9223372036854775808", "-100.1", "-1000.01",
@@ -116,7 +116,7 @@ public class DeleteWriterTest extends IntegrationTestBase {
                     "POLYGON((0 0, 0 1, 1 1, 0 0))", "POINT(-74.044514 40.689244)"));
             w.commit();
 
-            DeleteWriter d = new DeleteWriter(conn, database, allTypesTableBigKey, params, null);
+            DeleteWriter d = new DeleteWriter(conn, database, allTypesTableBigKey.getName(), allTypesTableBigKey.getColumnsList(), params, null);
             d.setHeader(allTypesColumns);
             d.writeRow(List.of("1", "FALSE", "false", "", "-128", "-32768", "-8388608",
                     "-2147483648", "-2147483648", "-9223372036854775808", "-100.1", "-1000.01",
@@ -144,11 +144,11 @@ public class DeleteWriterTest extends IntegrationTestBase {
             stmt.execute("INSERT INTO deletePartOfRows VALUES(7, 8, 9)");
             stmt.execute("INSERT INTO deletePartOfRows VALUES(10, 11, 12)");
 
-            Table t = JDBCUtil.getTable(conf, database, "deletePartOfRows");
+            Table t = JDBCUtil.getTable(conf, database, "deletePartOfRows", "deletePartOfRows");
             CsvFileParams params = CsvFileParams.newBuilder().setNullString("NULL")
                     .setUnmodifiedString("unm").build();
 
-            DeleteWriter d = new DeleteWriter(conn, database, t, params, null);
+            DeleteWriter d = new DeleteWriter(conn, database, t.getName(), t.getColumnsList(), params, null);
             d.setHeader(List.of("id", "a", "b"));
             d.writeRow(List.of("4", "unm", "unm"));
             d.writeRow(List.of("7", "unm", "unm"));
@@ -168,15 +168,15 @@ public class DeleteWriterTest extends IntegrationTestBase {
             stmt.execute("CREATE TABLE bigDelete(id INT PRIMARY KEY)");
 
             CsvFileParams params = CsvFileParams.newBuilder().setNullString("NULL").build();
-            Table t = JDBCUtil.getTable(conf, database, "bigDelete");
-            LoadDataWriter w = new LoadDataWriter(conn, database, t, params, null);
+            Table t = JDBCUtil.getTable(conf, database, "bigDelete", "bigDelete");
+            LoadDataWriter w = new LoadDataWriter(conn, database, t.getName(), t.getColumnsList(), params, null);
             w.setHeader(List.of("id"));
             for (Integer i = 0; i < 20000; i++) {
                 w.writeRow(List.of(i.toString()));
             }
             w.commit();
 
-            DeleteWriter d = new DeleteWriter(conn, database, t, params, null);
+            DeleteWriter d = new DeleteWriter(conn, database, t.getName(), t.getColumnsList(), params, null);
             d.setHeader(List.of("id"));
             for (Integer i = 0; i < 10000; i++) {
                 d.writeRow(List.of(i.toString()));
@@ -204,14 +204,14 @@ public class DeleteWriterTest extends IntegrationTestBase {
                 Statement stmt = conn.createStatement();) {
             stmt.execute(String.format("USE %s", database));
             stmt.executeQuery("CREATE TABLE allBytes(a BLOB PRIMARY KEY)");
-            Table allBytesTable = JDBCUtil.getTable(conf, database, "allBytes");
+            Table allBytesTable = JDBCUtil.getTable(conf, database, "allBytes", "allBytes");
             CsvFileParams params = CsvFileParams.newBuilder().setNullString("NULL").build();
-            LoadDataWriter w = new LoadDataWriter(conn, database, allBytesTable, params, null);
+            LoadDataWriter w = new LoadDataWriter(conn, database, allBytesTable.getName(), allBytesTable.getColumnsList(), params, null);
             w.setHeader(List.of("a"));
             w.writeRow(List.of(dataBase64));
             w.commit();
 
-            DeleteWriter d = new DeleteWriter(conn, database, allBytesTable, params, null);
+            DeleteWriter d = new DeleteWriter(conn, database, allBytesTable.getName(), allBytesTable.getColumnsList(), params, null);
             d.setHeader(List.of("a"));
             d.writeRow(List.of(dataBase64));
             d.commit();
