@@ -61,7 +61,14 @@ public class JDBCUtil {
         return true;
     }
 
-    static Table getTable(SingleStoreConfiguration conf, String database, String table)
+    static boolean checkDatabaseExists(Statement stmt, String database) throws SQLException {
+        try (ResultSet rs = stmt.executeQuery(
+                String.format("SHOW DATABASES LIKE %s", escapeString(database)))) {
+            return rs.next();
+        }
+    }
+
+    static Table getTable(SingleStoreConfiguration conf, String database, String table, String originalTableName)
             throws Exception {
         try (Connection conn = JDBCUtil.createConnection(conf)) {
             DatabaseMetaData metadata = conn.getMetaData();
@@ -101,7 +108,7 @@ public class JDBCUtil {
                 }
             }
 
-            return Table.newBuilder().setName(table).addAllColumns(columns).build();
+            return Table.newBuilder().setName(originalTableName).addAllColumns(columns).build();
         }
     }
 
@@ -165,10 +172,10 @@ public class JDBCUtil {
     static String generateAlterTableQuery(AlterTableRequest request) throws Exception {
         SingleStoreConfiguration conf = new SingleStoreConfiguration(request.getConfigurationMap());
 
-        String database = request.getSchemaName();
-        String table = request.getTable().getName();
+        String database = JDBCUtil.getDatabaseName(conf, request.getSchemaName());
+        String table = JDBCUtil.getTableName(conf, request.getSchemaName(), request.getTable().getName());
 
-        Table oldTable = getTable(conf, database, table);
+        Table oldTable = getTable(conf, database, table, request.getTable().getName());
         Table newTable = request.getTable();
 
         if (!pkEquals(oldTable, newTable)) {
@@ -201,15 +208,18 @@ public class JDBCUtil {
         return generateAlterTableQuery(database, table, columnsToAdd, columnsToChange);
     }
 
-    static String generateTruncateTableQuery(TruncateRequest request) {
+    static String generateTruncateTableQuery(SingleStoreConfiguration conf, TruncateRequest request) {
         String query;
+        String database = JDBCUtil.getDatabaseName(conf, request.getSchemaName());
+        String table = JDBCUtil.getTableName(conf, request.getSchemaName(), request.getTableName());
+
         if (request.hasSoft()) {
             query = String.format("UPDATE %s SET %s = 1 ",
-                    escapeTable(request.getSchemaName(), request.getTableName()),
+                    escapeTable(database, table),
                     escapeIdentifier(request.getSoft().getDeletedColumn()));
         } else {
             query = String.format("DELETE FROM %s ",
-                    escapeTable(request.getSchemaName(), request.getTableName()));
+                    escapeTable(database, table));
         }
 
         query += String.format("WHERE %s < FROM_UNIXTIME(%d.%09d)",
@@ -255,13 +265,18 @@ public class JDBCUtil {
         return query.toString();
     }
 
-    static String generateCreateTableQuery(CreateTableRequest request) {
-        String database = request.getSchemaName();
-        String table = request.getTable().getName();
+    static String generateCreateTableQuery(SingleStoreConfiguration conf, Statement stmt, CreateTableRequest request) throws SQLException {
+        String database = JDBCUtil.getDatabaseName(conf, request.getSchemaName());
+        String table = JDBCUtil.getTableName(conf, request.getSchemaName(), request.getTable().getName());
         String columnDefinitions = getColumnDefinitions(request.getTable().getColumnsList());
 
-        return String.format("CREATE DATABASE IF NOT EXISTS %s; CREATE TABLE %s (%s)",
-                escapeIdentifier(database), escapeTable(database, table), columnDefinitions);
+        if (!checkDatabaseExists(stmt, database)) {
+            return String.format("CREATE DATABASE IF NOT EXISTS %s; CREATE TABLE %s (%s)",
+                    escapeIdentifier(database), escapeTable(database, table), columnDefinitions);
+        } else {
+            return String.format("CREATE TABLE %s (%s)",
+                    escapeTable(database, table), columnDefinitions);
+        }
     }
 
     static String getColumnDefinitions(List<Column> columns) {
@@ -398,6 +413,22 @@ public class JDBCUtil {
     static class TableNotExistException extends Exception {
         TableNotExistException() {
             super("Table doesn't exist");
+        }
+    }
+
+    public static String getDatabaseName(SingleStoreConfiguration conf, String schema) {
+        if (conf.database() != null) {
+            return conf.database();
+        } else {
+            return schema;
+        }
+    }
+
+    public static String getTableName(SingleStoreConfiguration conf, String schema, String table) {
+        if (conf.database() != null) {
+            return String.format("%s__%s", schema, table);
+        } else {
+            return table;
         }
     }
 }

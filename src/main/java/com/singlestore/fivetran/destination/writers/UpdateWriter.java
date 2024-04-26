@@ -14,36 +14,36 @@ import java.util.Map;
 
 // TODO: PLAT-6897 allow to configure batch size in writers
 public class UpdateWriter extends Writer {
-    public UpdateWriter(Connection conn, String database, Table table, CsvFileParams params,
+    public UpdateWriter(Connection conn, String database, String table, List<Column> columns, CsvFileParams params,
             Map<String, ByteString> secretKeys) {
-        super(conn, database, table, params, secretKeys);
+        super(conn, database, table, columns, params, secretKeys);
     }
 
-    List<Column> columns = new ArrayList<>();
+    List<Column> headerColumns = new ArrayList<>();
 
     @Override
     public void setHeader(List<String> header) {
         Map<String, Column> nameToColumn = new HashMap<>();
-        for (Column column : table.getColumnsList()) {
+        for (Column column : columns) {
             nameToColumn.put(column.getName(), column);
         }
 
         for (String name : header) {
-            columns.add(nameToColumn.get(name));
+            headerColumns.add(nameToColumn.get(name));
         }
     }
 
     @Override
     public void writeRow(List<String> row) throws SQLException {
         StringBuilder updateClause = new StringBuilder(
-                String.format("UPDATE %s SET ", JDBCUtil.escapeTable(database, table.getName())));
+                String.format("UPDATE %s SET ", JDBCUtil.escapeTable(database, table)));
         StringBuilder whereClause = new StringBuilder("WHERE ");
 
         boolean firstUpdateColumn = true;
         boolean firstPKColumn = true;
 
         for (int i = 0; i < row.size(); i++) {
-            Column c = columns.get(i);
+            Column c = headerColumns.get(i);
             if (!row.get(i).equals(params.getUnmodifiedString())) {
                 if (firstUpdateColumn) {
                     updateClause.append(
@@ -83,18 +83,18 @@ public class UpdateWriter extends Writer {
                 }
 
                 paramIndex++;
-                JDBCUtil.setParameter(stmt, paramIndex, columns.get(i).getType(), value,
+                JDBCUtil.setParameter(stmt, paramIndex, headerColumns.get(i).getType(), value,
                         params.getNullString());
             }
 
             for (int i = 0; i < row.size(); i++) {
                 String value = row.get(i);
-                if (!columns.get(i).getPrimaryKey()) {
+                if (!headerColumns.get(i).getPrimaryKey()) {
                     continue;
                 }
 
                 paramIndex++;
-                JDBCUtil.setParameter(stmt, paramIndex, columns.get(i).getType(), value,
+                JDBCUtil.setParameter(stmt, paramIndex, headerColumns.get(i).getType(), value,
                         params.getNullString());
             }
 

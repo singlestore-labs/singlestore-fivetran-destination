@@ -38,7 +38,7 @@ public class AlterTableTest extends IntegrationTestBase {
 
             String query = JDBCUtil.generateAlterTableQuery(request);
             stmt.execute(query);
-            Table result = JDBCUtil.getTable(conf, database, "addColumn");
+            Table result = JDBCUtil.getTable(conf, database, "addColumn", "addColumn");
             List<Column> columns = result.getColumnsList();
 
             assertEquals("a", columns.get(0).getName());
@@ -69,7 +69,7 @@ public class AlterTableTest extends IntegrationTestBase {
 
             String query = JDBCUtil.generateAlterTableQuery(request);
             stmt.execute(query);
-            Table result = JDBCUtil.getTable(conf, database, "changeDataType");
+            Table result = JDBCUtil.getTable(conf, database, "changeDataType", "changeDataType");
             List<Column> columns = result.getColumnsList();
 
             assertEquals("a", columns.get(0).getName());
@@ -119,7 +119,7 @@ public class AlterTableTest extends IntegrationTestBase {
 
             String query = JDBCUtil.generateAlterTableQuery(request);
             stmt.execute(query);
-            Table result = JDBCUtil.getTable(conf, database, "severalOperations");
+            Table result = JDBCUtil.getTable(conf, database, "severalOperations", "severalOperations");
             List<Column> columns = result.getColumnsList();
 
             assertEquals("a", columns.get(0).getName());
@@ -158,7 +158,7 @@ public class AlterTableTest extends IntegrationTestBase {
 
             String query = JDBCUtil.generateAlterTableQuery(request);
             stmt.execute(query);
-            Table result = JDBCUtil.getTable(conf, database, "changeScaleAndPrecision");
+            Table result = JDBCUtil.getTable(conf, database, "changeScaleAndPrecision", "changeScaleAndPrecision");
             List<Column> columns = result.getColumnsList();
 
             assertEquals("a", columns.get(0).getName());
@@ -191,7 +191,7 @@ public class AlterTableTest extends IntegrationTestBase {
             CreateTableRequest createRequest = CreateTableRequest.newBuilder()
                     .setSchemaName(database).setTable(naiveDatetimeTable).build();
 
-            String query = JDBCUtil.generateCreateTableQuery(createRequest);
+            String query = JDBCUtil.generateCreateTableQuery(conf, stmt, createRequest);
             stmt.execute(query);
 
             AlterTableRequest alterRequest =

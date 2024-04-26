@@ -5,6 +5,7 @@ import java.util.Map;
 public class SingleStoreConfiguration {
     private final String host;
     private final Integer port;
+    private final String database;
     private final String user;
     private final String password;
     private final String sslMode;
@@ -14,6 +15,7 @@ public class SingleStoreConfiguration {
     SingleStoreConfiguration(Map<String, String> conf) {
         this.host = conf.get("host");
         this.port = Integer.valueOf(conf.get("port"));
+        this.database = conf.get("database");
         this.user = conf.get("user");
         this.password = conf.get("password");
         this.sslMode = conf.get("ssl.mode");
@@ -27,6 +29,10 @@ public class SingleStoreConfiguration {
 
     public Integer port() {
         return port;
+    }
+
+    public String database() {
+        return database;
     }
 
     public String user() {

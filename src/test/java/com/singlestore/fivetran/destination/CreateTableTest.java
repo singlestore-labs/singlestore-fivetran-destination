@@ -58,11 +58,11 @@ public class CreateTableTest extends IntegrationTestBase {
         CreateTableRequest request = CreateTableRequest.newBuilder().setSchemaName(database)
                 .setTable(allTypesCreateTable).build();
 
-        String query = JDBCUtil.generateCreateTableQuery(request);
         try (Connection conn = JDBCUtil.createConnection(conf);
                 Statement stmt = conn.createStatement();) {
+            String query = JDBCUtil.generateCreateTableQuery(conf, stmt, request);
             stmt.execute(query);
-            Table result = JDBCUtil.getTable(conf, database, "allTypesCreateTable");
+            Table result = JDBCUtil.getTable(conf, database, "allTypesCreateTable", "allTypesCreateTable");
             assertEquals("allTypesCreateTable", result.getName());
             List<Column> columns = result.getColumnsList();
 
@@ -142,11 +142,11 @@ public class CreateTableTest extends IntegrationTestBase {
         CreateTableRequest request =
                 CreateTableRequest.newBuilder().setSchemaName(database).setTable(t).build();
 
-        String query = JDBCUtil.generateCreateTableQuery(request);
         try (Connection conn = JDBCUtil.createConnection(conf);
                 Statement stmt = conn.createStatement();) {
+            String query = JDBCUtil.generateCreateTableQuery(conf, stmt, request);
             stmt.execute(query);
-            Table result = JDBCUtil.getTable(conf, database, "scaleAndPrecision");
+            Table result = JDBCUtil.getTable(conf, database, "scaleAndPrecision", "scaleAndPrecision");
             assertEquals("scaleAndPrecision", result.getName());
             List<Column> columns = result.getColumnsList();
 
@@ -173,10 +173,10 @@ public class CreateTableTest extends IntegrationTestBase {
         CreateTableRequest request =
                 CreateTableRequest.newBuilder().setSchemaName(database).setTable(t).build();
 
-        String query = JDBCUtil.generateCreateTableQuery(request);
         try (Connection conn = JDBCUtil.createConnection(conf);
                 Statement stmt = conn.createStatement();) {
             stmt.execute(String.format("DROP DATABASE IF EXISTS %s", database));
+            String query = JDBCUtil.generateCreateTableQuery(conf, stmt, request);
             stmt.execute(query);
 
             try (ResultSet resultSet = conn.getMetaData().getCatalogs();) {
