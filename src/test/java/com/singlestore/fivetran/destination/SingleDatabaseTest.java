@@ -36,7 +36,7 @@ public class SingleDatabaseTest extends IntegrationTestBase {
             stmt.execute(query);
 
             // GET TABLE
-            Table result = JDBCUtil.getTable(conf, database, "schema_checkSingleDatabase", "checkSingleDatabase");
+            Table result = JDBCUtil.getTable(conf, database, "schema__checkSingleDatabase", "checkSingleDatabase");
             assertEquals("checkSingleDatabase", result.getName());
             List<Column> columns = result.getColumnsList();
 
@@ -58,7 +58,7 @@ public class SingleDatabaseTest extends IntegrationTestBase {
             query = JDBCUtil.generateAlterTableQuery(alterRequest);
             stmt.execute(query);
 
-            result = JDBCUtil.getTable(conf, database, "schema_checkSingleDatabase", "checkSingleDatabase");
+            result = JDBCUtil.getTable(conf, database, "schema__checkSingleDatabase", "checkSingleDatabase");
             assertEquals("checkSingleDatabase", result.getName());
             columns = result.getColumnsList();
 
@@ -74,30 +74,30 @@ public class SingleDatabaseTest extends IntegrationTestBase {
 
             // WRITE DATA
             CsvFileParams params = CsvFileParams.newBuilder().setNullString("NULL").build();
-            LoadDataWriter w = new LoadDataWriter(conn, database, "schema_checkSingleDatabase", t.getColumnsList(), params, null);
+            LoadDataWriter w = new LoadDataWriter(conn, database, "schema__checkSingleDatabase", t.getColumnsList(), params, null);
             w.setHeader(List.of("a", "b", "c"));
             w.writeRow(List.of("1", "2", "2038-01-19 03:14:07.123455"));
             w.writeRow(List.of("3", "4", "2038-01-19 03:14:07.123460"));
             w.commit();
-            checkResult("SELECT * FROM `schema_checkSingleDatabase` ORDER BY a", Arrays.asList(
+            checkResult("SELECT * FROM `schema__checkSingleDatabase` ORDER BY a", Arrays.asList(
                     Arrays.asList("1", "2", "2038-01-19 03:14:07.123455"),
                     Arrays.asList("3", "4", "2038-01-19 03:14:07.123460")));
 
             // UPDATE DATA
-            UpdateWriter u = new UpdateWriter(conn, database, "schema_checkSingleDatabase", t.getColumnsList(), params, null);
+            UpdateWriter u = new UpdateWriter(conn, database, "schema__checkSingleDatabase", t.getColumnsList(), params, null);
             u.setHeader(List.of("a", "b", "c"));
             u.writeRow(List.of("1", "5", "2038-01-19 03:14:07.123455"));
             u.commit();
-            checkResult("SELECT * FROM `schema_checkSingleDatabase` ORDER BY a", Arrays.asList(
+            checkResult("SELECT * FROM `schema__checkSingleDatabase` ORDER BY a", Arrays.asList(
                     Arrays.asList("1", "5", "2038-01-19 03:14:07.123455"),
                     Arrays.asList("3", "4", "2038-01-19 03:14:07.123460")));
 
             // DELETE DATA
-            DeleteWriter d = new DeleteWriter(conn, database, "schema_checkSingleDatabase", t.getColumnsList(), params, null);
+            DeleteWriter d = new DeleteWriter(conn, database, "schema__checkSingleDatabase", t.getColumnsList(), params, null);
             d.setHeader(List.of("a", "b", "c"));
             d.writeRow(List.of("3", "4", "2038-01-19 03:14:07.123460"));
             d.commit();
-            checkResult("SELECT * FROM `schema_checkSingleDatabase` ORDER BY a", Arrays.asList(
+            checkResult("SELECT * FROM `schema__checkSingleDatabase` ORDER BY a", Arrays.asList(
                     Arrays.asList("1", "5", "2038-01-19 03:14:07.123455")));
 
             // TRUNCATE
@@ -110,7 +110,7 @@ public class SingleDatabaseTest extends IntegrationTestBase {
 
             stmt.execute(JDBCUtil.generateTruncateTableQuery(conf, tr));
             
-            checkResult("SELECT * FROM `schema_checkSingleDatabase` ORDER BY a", Arrays.asList());
+            checkResult("SELECT * FROM `schema__checkSingleDatabase` ORDER BY a", Arrays.asList());
         }
     }
 }

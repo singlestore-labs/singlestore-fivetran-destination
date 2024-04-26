@@ -426,7 +426,7 @@ public class JDBCUtil {
 
     public static String getTableName(SingleStoreConfiguration conf, String schema, String table) {
         if (conf.database() != null) {
-            return String.format("%s_%s", schema, table);
+            return String.format("%s__%s", schema, table);
         } else {
             return table;
         }

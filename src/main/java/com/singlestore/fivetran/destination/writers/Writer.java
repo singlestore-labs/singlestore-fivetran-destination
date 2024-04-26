@@ -3,7 +3,10 @@ package com.singlestore.fivetran.destination.writers;
 import com.github.luben.zstd.ZstdInputStream;
 import com.google.protobuf.ByteString;
 import com.opencsv.CSVReader;
-import fivetran_sdk.*;
+import fivetran_sdk.Column;
+import fivetran_sdk.Compression;
+import fivetran_sdk.CsvFileParams;
+import fivetran_sdk.Encryption;
 
 import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;

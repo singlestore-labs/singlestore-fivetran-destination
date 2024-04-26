@@ -30,7 +30,7 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
                                 .setDescription(
                                         "SingleStore database in which data should be written.\n" +
                                                 "If this option is specified, data will be written to a single database.\n" +
-                                                "Each table name will consist of Fivetran schema name and table name (For example: `<schema>_<table>`).\n" +
+                                                "Each table name will consist of Fivetran schema name and table name (For example: `<schema>__<table>`).\n" +
                                                 "If this option is not specified, appropriate SingleStore database will be created for each schema.\n" +
                                                 "'CREATE DATABASE' permissions are required in this case.")
                                 .setTextField(TextField.PlainText).build(),
