@@ -2,7 +2,9 @@ package com.singlestore.fivetran.destination.writers;
 
 import com.github.luben.zstd.ZstdInputStream;
 import com.google.protobuf.ByteString;
+import com.opencsv.CSVParserBuilder;
 import com.opencsv.CSVReader;
+import com.opencsv.CSVReaderBuilder;
 import fivetran_sdk.Column;
 import fivetran_sdk.Compression;
 import fivetran_sdk.CsvFileParams;
@@ -31,8 +33,8 @@ abstract public class Writer {
     CsvFileParams params;
     Map<String, ByteString> secretKeys;
 
-    public Writer(Connection conn, String database, String table, List<Column> columns, CsvFileParams params,
-            Map<String, ByteString> secretKeys) {
+    public Writer(Connection conn, String database, String table, List<Column> columns,
+            CsvFileParams params, Map<String, ByteString> secretKeys) {
         this.conn = conn;
         this.database = database;
         this.columns = columns;
@@ -87,7 +89,9 @@ abstract public class Writer {
             }
 
             try (CSVReader csvReader =
-                    new CSVReader(new BufferedReader(new InputStreamReader(uncompressed)))) {
+                    new CSVReaderBuilder(new BufferedReader(new InputStreamReader(uncompressed)))
+                            .withCSVParser(new CSVParserBuilder().withEscapeChar('\0').build())
+                            .build()) {
                 String[] headerString = csvReader.readNext();
                 if (headerString == null) {
                     // finish if file is empty
