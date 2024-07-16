@@ -93,9 +93,15 @@ public class AlterTableTest extends IntegrationTestBase {
             AlterTableRequest request = AlterTableRequest.newBuilder().putAllConfiguration(confMap)
                     .setSchemaName(database).setTable(table).build();
 
-            Exception ex =
-                    assertThrows(Exception.class, () -> JDBCUtil.generateAlterTableQuery(request));
-            assertEquals("Changing PRIMARY KEY is not supported in SingleStore", ex.getMessage());
+            String query = JDBCUtil.generateAlterTableQuery(request);
+            stmt.execute(query);
+            Table result = JDBCUtil.getTable(conf, database, "changeTypeOfKey", "changeTypeOfKey");
+            List<Column> columns = result.getColumnsList();
+
+            assertEquals("a", columns.get(0).getName());
+            assertEquals(DataType.INT, columns.get(0).getType());
+            assertEquals(true, columns.get(0).getPrimaryKey());
+
         }
     }
 
