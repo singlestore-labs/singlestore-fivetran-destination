@@ -95,7 +95,7 @@ public class AlterTableTest extends IntegrationTestBase {
 
             String query = JDBCUtil.generateAlterTableQuery(request);
             stmt.execute(query);
-            Table result = JDBCUtil.getTable(conf, database, "changeTypeOfKey", "changeTypeOfKey");
+            Table result = JDBCUtil.getTable(conf, database, "changeKey", "changeKey");
             List<Column> columns = result.getColumnsList();
 
             assertEquals("a", columns.get(0).getName());
