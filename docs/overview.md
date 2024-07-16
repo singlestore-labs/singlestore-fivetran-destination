@@ -50,7 +50,6 @@ The following table illustrates how Fivetran data types are transformed into Sin
 
 | Schema Change          | Supported | Notes                                                                                                     |
 |------------------------|-----------|-----------------------------------------------------------------------------------------------------------|
-| Add column             | ✔       | When Fivetran detects the addition of a column in your source, it automatically adds that column in the SingleStore destination. |
-| Change column type     | ✔       | When Fivetran detects a change in the column type in the data source, it automatically changes the column type in the SingleStore destination. To change the column type, Fivetran creates a new column, copies the data from the existing column to the new column, deletes the existing column, and renames the new column. |
-| Change key             | ✘      | Changing PRIMARY KEY is not supported in SingleStore. |
-| Change key column type | ✘      | Changing PRIMARY KEY column data type is not supported in SingleStore. |
+| Add column                    | ✔       | When Fivetran detects the addition of a column in your source, it automatically adds that column in the SingleStore destination. |
+| Change column type            | ✔       | When Fivetran detects a change in the column type in the data source, it automatically changes the column type in the SingleStore destination. To change the column type, Fivetran creates a new column, copies the data from the existing column to the new column, deletes the existing column, and renames the new column. |
+| Change key or key column type | ✔       | Changing PRIMARY KEY is not supported in SingleStore. When Fivetran detects a change in a key, it creates a new table with updated PRIMARY KEY, copies the data from the existing table to the new one, deletes the existing table, and renames the new table |
