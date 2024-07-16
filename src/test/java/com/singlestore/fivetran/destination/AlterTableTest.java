@@ -93,9 +93,15 @@ public class AlterTableTest extends IntegrationTestBase {
             AlterTableRequest request = AlterTableRequest.newBuilder().putAllConfiguration(confMap)
                     .setSchemaName(database).setTable(table).build();
 
-            Exception ex =
-                    assertThrows(Exception.class, () -> JDBCUtil.generateAlterTableQuery(request));
-            assertEquals("Changing PRIMARY KEY is not supported in SingleStore", ex.getMessage());
+            String query = JDBCUtil.generateAlterTableQuery(request);
+            stmt.execute(query);
+            Table result = JDBCUtil.getTable(conf, database, "changeKey", "changeKey");
+            List<Column> columns = result.getColumnsList();
+
+            assertEquals("a", columns.get(0).getName());
+            assertEquals(DataType.INT, columns.get(0).getType());
+            assertEquals(true, columns.get(0).getPrimaryKey());
+
         }
     }
 
@@ -119,7 +125,8 @@ public class AlterTableTest extends IntegrationTestBase {
 
             String query = JDBCUtil.generateAlterTableQuery(request);
             stmt.execute(query);
-            Table result = JDBCUtil.getTable(conf, database, "severalOperations", "severalOperations");
+            Table result =
+                    JDBCUtil.getTable(conf, database, "severalOperations", "severalOperations");
             List<Column> columns = result.getColumnsList();
 
             assertEquals("a", columns.get(0).getName());
@@ -158,7 +165,8 @@ public class AlterTableTest extends IntegrationTestBase {
 
             String query = JDBCUtil.generateAlterTableQuery(request);
             stmt.execute(query);
-            Table result = JDBCUtil.getTable(conf, database, "changeScaleAndPrecision", "changeScaleAndPrecision");
+            Table result = JDBCUtil.getTable(conf, database, "changeScaleAndPrecision",
+                    "changeScaleAndPrecision");
             List<Column> columns = result.getColumnsList();
 
             assertEquals("a", columns.get(0).getName());
@@ -209,18 +217,33 @@ public class AlterTableTest extends IntegrationTestBase {
                 Statement stmt = conn.createStatement();) {
             stmt.execute(String.format("USE %s", database));
             stmt.execute("CREATE TABLE changeTypeOfKey(a INT PRIMARY KEY)");
+            stmt.execute("INSERT INTO changeTypeOfKey VALUES (1), (2)");
             Table table = Table.newBuilder().setName("changeTypeOfKey")
                     .addAllColumns(Arrays.asList(Column.newBuilder().setName("a")
                             .setType(DataType.LONG).setPrimaryKey(true).build()))
+                    .addAllColumns(Arrays.asList(
+                            Column.newBuilder().setName("b").setType(DataType.LONG).build()))
                     .build();
 
             AlterTableRequest request = AlterTableRequest.newBuilder().putAllConfiguration(confMap)
                     .setSchemaName(database).setTable(table).build();
 
-            Exception ex =
-                    assertThrows(Exception.class, () -> JDBCUtil.generateAlterTableQuery(request));
-            assertEquals("Changing PRIMARY KEY column data type is not supported in SingleStore",
-                    ex.getMessage());
+            String query = JDBCUtil.generateAlterTableQuery(request);
+
+            stmt.execute(query);
+            Table result = JDBCUtil.getTable(conf, database, "changeTypeOfKey", "changeTypeOfKey");
+            List<Column> columns = result.getColumnsList();
+
+            assertEquals("a", columns.get(0).getName());
+            assertEquals(DataType.LONG, columns.get(0).getType());
+            assertEquals(true, columns.get(0).getPrimaryKey());
+
+            assertEquals("b", columns.get(1).getName());
+            assertEquals(DataType.LONG, columns.get(1).getType());
+            assertEquals(false, columns.get(1).getPrimaryKey());
+
+            checkResult("SELECT * FROM `changeTypeOfKey` ORDER BY a",
+                    Arrays.asList(Arrays.asList("1", null), Arrays.asList("2", null)));
         }
     }
 }

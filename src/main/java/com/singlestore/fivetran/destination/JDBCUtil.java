@@ -62,14 +62,14 @@ public class JDBCUtil {
     }
 
     static boolean checkDatabaseExists(Statement stmt, String database) throws SQLException {
-        try (ResultSet rs = stmt.executeQuery(
-                String.format("SHOW DATABASES LIKE %s", escapeString(database)))) {
+        try (ResultSet rs = stmt
+                .executeQuery(String.format("SHOW DATABASES LIKE %s", escapeString(database)))) {
             return rs.next();
         }
     }
 
-    static Table getTable(SingleStoreConfiguration conf, String database, String table, String originalTableName)
-            throws Exception {
+    static Table getTable(SingleStoreConfiguration conf, String database, String table,
+            String originalTableName) throws Exception {
         try (Connection conn = JDBCUtil.createConnection(conf)) {
             DatabaseMetaData metadata = conn.getMetaData();
 
@@ -173,13 +173,15 @@ public class JDBCUtil {
         SingleStoreConfiguration conf = new SingleStoreConfiguration(request.getConfigurationMap());
 
         String database = JDBCUtil.getDatabaseName(conf, request.getSchemaName());
-        String table = JDBCUtil.getTableName(conf, request.getSchemaName(), request.getTable().getName());
+        String table =
+                JDBCUtil.getTableName(conf, request.getSchemaName(), request.getTable().getName());
 
         Table oldTable = getTable(conf, database, table, request.getTable().getName());
         Table newTable = request.getTable();
+        boolean pkChanged = false;
 
         if (!pkEquals(oldTable, newTable)) {
-            throw new Exception("Changing PRIMARY KEY is not supported in SingleStore");
+            pkChanged = true;
         }
 
         Map<String, Column> oldColumns = oldTable.getColumnsList().stream()
@@ -187,39 +189,63 @@ public class JDBCUtil {
 
         List<Column> columnsToAdd = new ArrayList<>();
         List<Column> columnsToChange = new ArrayList<>();
+        List<Column> commonColumns = new ArrayList();
 
         for (Column column : newTable.getColumnsList()) {
             Column oldColumn = oldColumns.get(column.getName());
             if (oldColumn == null) {
                 columnsToAdd.add(column);
             } else {
+                commonColumns.add(column);
                 String oldType = mapDataTypes(oldColumn.getType(), oldColumn.getDecimal());
                 String newType = mapDataTypes(column.getType(), column.getDecimal());
                 if (!oldType.equals(newType)) {
                     if (oldColumn.getPrimaryKey()) {
-                        throw new Exception(
-                                "Changing PRIMARY KEY column data type is not supported in SingleStore");
+                        pkChanged = true;
+                        continue;
                     }
                     columnsToChange.add(column);
                 }
             }
         }
 
-        return generateAlterTableQuery(database, table, columnsToAdd, columnsToChange);
+        if (pkChanged) {
+            logger.warn(
+                    "Alter table changes the key of the table. This operation is not supported by SingleStore. The table will be recreated from scratch.");
+
+            return generateRecreateTableQuery(database, table, newTable, commonColumns);
+        } else {
+            return generateAlterTableQuery(database, table, columnsToAdd, columnsToChange);
+        }
     }
 
-    static String generateTruncateTableQuery(SingleStoreConfiguration conf, TruncateRequest request) {
+    static String generateRecreateTableQuery(String database, String tableName, Table table,
+            List<Column> commonColumns) {
+        String tmpTableName = tableName + "_alter_tmp";
+        String columns = commonColumns.stream().map(column -> escapeIdentifier(column.getName()))
+                .collect(Collectors.joining(", "));
+
+        String createTable = generateCreateTableQuery(database, tmpTableName, table);
+        String insertData = String.format("INSERT INTO %s (%s) SELECT %s FROM %s",
+                escapeTable(database, tmpTableName), columns, columns,
+                escapeTable(database, tableName));
+        String dropTable = String.format("DROP TABLE %s", escapeTable(database, tableName));
+        String renameTable = String.format("ALTER TABLE %s RENAME AS %s", tmpTableName, tableName);
+
+        return String.join("; ", createTable, insertData, dropTable, renameTable);
+    }
+
+    static String generateTruncateTableQuery(SingleStoreConfiguration conf,
+            TruncateRequest request) {
         String query;
         String database = JDBCUtil.getDatabaseName(conf, request.getSchemaName());
         String table = JDBCUtil.getTableName(conf, request.getSchemaName(), request.getTableName());
 
         if (request.hasSoft()) {
-            query = String.format("UPDATE %s SET %s = 1 ",
-                    escapeTable(database, table),
+            query = String.format("UPDATE %s SET %s = 1 ", escapeTable(database, table),
                     escapeIdentifier(request.getSoft().getDeletedColumn()));
         } else {
-            query = String.format("DELETE FROM %s ",
-                    escapeTable(database, table));
+            query = String.format("DELETE FROM %s ", escapeTable(database, table));
         }
 
         query += String.format("WHERE %s < FROM_UNIXTIME(%d.%09d)",
@@ -265,17 +291,24 @@ public class JDBCUtil {
         return query.toString();
     }
 
-    static String generateCreateTableQuery(SingleStoreConfiguration conf, Statement stmt, CreateTableRequest request) throws SQLException {
+    static String generateCreateTableQuery(String database, String tableName, Table table) {
+        String columnDefinitions = getColumnDefinitions(table.getColumnsList());
+        return String.format("CREATE TABLE %s (%s)", escapeTable(database, tableName),
+                columnDefinitions);
+    }
+
+    static String generateCreateTableQuery(SingleStoreConfiguration conf, Statement stmt,
+            CreateTableRequest request) throws SQLException {
         String database = JDBCUtil.getDatabaseName(conf, request.getSchemaName());
-        String table = JDBCUtil.getTableName(conf, request.getSchemaName(), request.getTable().getName());
-        String columnDefinitions = getColumnDefinitions(request.getTable().getColumnsList());
+        String table =
+                JDBCUtil.getTableName(conf, request.getSchemaName(), request.getTable().getName());
+        String createTableQuery = generateCreateTableQuery(database, table, request.getTable());
 
         if (!checkDatabaseExists(stmt, database)) {
-            return String.format("CREATE DATABASE IF NOT EXISTS %s; CREATE TABLE %s (%s)",
-                    escapeIdentifier(database), escapeTable(database, table), columnDefinitions);
+            return String.format("CREATE DATABASE IF NOT EXISTS %s; %s", escapeIdentifier(database),
+                    createTableQuery);
         } else {
-            return String.format("CREATE TABLE %s (%s)",
-                    escapeTable(database, table), columnDefinitions);
+            return createTableQuery;
         }
     }
 
