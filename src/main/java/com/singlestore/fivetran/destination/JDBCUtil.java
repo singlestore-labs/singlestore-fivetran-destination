@@ -189,7 +189,7 @@ public class JDBCUtil {
 
         List<Column> columnsToAdd = new ArrayList<>();
         List<Column> columnsToChange = new ArrayList<>();
-        List<Column> commonColumns = new ArrayList();
+        List<Column> commonColumns = new ArrayList<>();
 
         for (Column column : newTable.getColumnsList()) {
             Column oldColumn = oldColumns.get(column.getName());
@@ -230,7 +230,8 @@ public class JDBCUtil {
                 escapeTable(database, tmpTableName), columns, columns,
                 escapeTable(database, tableName));
         String dropTable = String.format("DROP TABLE %s", escapeTable(database, tableName));
-        String renameTable = String.format("ALTER TABLE %s RENAME AS %s", tmpTableName, tableName);
+        String renameTable = String.format("ALTER TABLE %s RENAME AS %s",
+                escapeTable(database, tmpTableName), escapeTable(database, tableName));
 
         return String.join("; ", createTable, insertData, dropTable, renameTable);
     }

@@ -215,9 +215,9 @@ public class AlterTableTest extends IntegrationTestBase {
     public void changeTypeOfKey() throws Exception {
         try (Connection conn = JDBCUtil.createConnection(conf);
                 Statement stmt = conn.createStatement();) {
-            stmt.execute(String.format("USE %s", database));
-            stmt.execute("CREATE TABLE changeTypeOfKey(a INT PRIMARY KEY)");
-            stmt.execute("INSERT INTO changeTypeOfKey VALUES (1), (2)");
+            stmt.execute(
+                    String.format("CREATE TABLE %s.changeTypeOfKey(a INT PRIMARY KEY)", database));
+            stmt.execute(String.format("INSERT INTO %s.changeTypeOfKey VALUES (1), (2)", database));
             Table table = Table.newBuilder().setName("changeTypeOfKey")
                     .addAllColumns(Arrays.asList(Column.newBuilder().setName("a")
                             .setType(DataType.LONG).setPrimaryKey(true).build()))
@@ -242,7 +242,7 @@ public class AlterTableTest extends IntegrationTestBase {
             assertEquals(DataType.LONG, columns.get(1).getType());
             assertEquals(false, columns.get(1).getPrimaryKey());
 
-            checkResult("SELECT * FROM `changeTypeOfKey` ORDER BY a",
+            checkResult(String.format("SELECT * FROM %s.`changeTypeOfKey` ORDER BY a", database),
                     Arrays.asList(Arrays.asList("1", null), Arrays.asList("2", null)));
         }
     }
