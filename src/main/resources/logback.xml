@@ -6,7 +6,7 @@
         <onMismatch>DENY</onMismatch>
     </filter>
     <encoder>
-      <pattern>{"level":"INFO", "message": "%m", "message-origin": "sdk_destination"}%n</pattern>
+      <pattern>{"level":"INFO", "message": "%replace(%m){'[\r\n]+', ' '}", "message-origin": "sdk_destination"}%n</pattern>
     </encoder>
   </appender>
   <appender name="STDOUT-WARN" class="ch.qos.logback.core.ConsoleAppender">
@@ -16,7 +16,7 @@
         <onMismatch>DENY</onMismatch>
     </filter>
     <encoder>
-      <pattern>{"level":"WARNING", "message": "%m", "message-origin": "sdk_destination"}%n</pattern>
+      <pattern>{"level":"WARNING", "message": "%replace(%m){'[\r\n]+', ' '}", "message-origin": "sdk_destination"}%n</pattern>
     </encoder>
   </appender>
   <appender name="STDOUT-SEVERE" class="ch.qos.logback.core.ConsoleAppender">
@@ -26,7 +26,7 @@
         <onMismatch>DENY</onMismatch>
     </filter>
     <encoder>
-      <pattern>{"level":"SEVERE", "message": "%m", "message-origin": "sdk_destination"}%n</pattern>
+      <pattern>{"level":"SEVERE", "message": "%replace(%m){'[\r\n]+', ' '}", "message-origin": "sdk_destination"}%n</pattern>
     </encoder>
   </appender>
 

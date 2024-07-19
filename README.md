@@ -11,7 +11,7 @@ gradle jar
 ```
 2. Run the Jar
 ```
-java -jar build/libs/singlestore-fivetran-destination.jar 
+java -jar build/libs/singlestore-fivetran-destination-1.0.3.jar 
 ```
 
 ## Steps for running Java tests
