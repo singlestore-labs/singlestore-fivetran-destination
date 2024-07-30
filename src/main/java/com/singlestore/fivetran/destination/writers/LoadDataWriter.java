@@ -49,6 +49,7 @@ public class LoadDataWriter extends Writer {
         outputStream = new PipedOutputStream();
         inputStream = new PipedInputStream(outputStream, BUFFER_SIZE);
         headerColumns = new ArrayList<>();
+        queryException[0] = null;
 
         Map<String, Column> nameToColumn = new HashMap<>();
         for (Column column : columns) {

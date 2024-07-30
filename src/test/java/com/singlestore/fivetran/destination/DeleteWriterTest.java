@@ -181,6 +181,7 @@ public class DeleteWriterTest extends IntegrationTestBase {
                 w.writeRow(List.of(i.toString()));
                 if (i % 1000 == 0) {
                     w.commit();
+                    w.setHeader(List.of("id"));
                 }
             }
             w.commit();
@@ -192,6 +193,7 @@ public class DeleteWriterTest extends IntegrationTestBase {
                 d.writeRow(List.of(i.toString()));
                 if (i % 1000 == 0) {
                     d.commit();
+                    d.setHeader(List.of("id"));
                 }
             }
             d.commit();
