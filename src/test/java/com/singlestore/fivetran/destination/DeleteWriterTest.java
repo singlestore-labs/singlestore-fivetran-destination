@@ -177,6 +177,9 @@ public class DeleteWriterTest extends IntegrationTestBase {
             w.setHeader(List.of("id"));
             for (Integer i = 0; i < 20000; i++) {
                 w.writeRow(List.of(i.toString()));
+                if (i % 10000 == 0) {
+                    w.commit();
+                }
             }
             w.commit();
 
