@@ -27,9 +27,9 @@ public class LoadDataWriter extends Writer {
 
     final int BUFFER_SIZE = 524288;
 
-    List<Column> headerColumns = new ArrayList<>();
-    PipedOutputStream outputStream = new PipedOutputStream();
-    PipedInputStream inputStream = new PipedInputStream(outputStream, BUFFER_SIZE);
+    List<Column> headerColumns;
+    PipedOutputStream outputStream;
+    PipedInputStream inputStream;
     Thread t;
     final SQLException[] queryException = new SQLException[1];
     Statement stmt;
@@ -45,7 +45,11 @@ public class LoadDataWriter extends Writer {
     }
 
     @Override
-    public void setHeader(List<String> header) throws SQLException {
+    public void setHeader(List<String> header) throws SQLException, IOException {
+        outputStream = new PipedOutputStream();
+        inputStream = new PipedInputStream(outputStream, BUFFER_SIZE);
+        headerColumns = new ArrayList<>();
+
         Map<String, Column> nameToColumn = new HashMap<>();
         for (Column column : columns) {
             nameToColumn.put(column.getName(), column);

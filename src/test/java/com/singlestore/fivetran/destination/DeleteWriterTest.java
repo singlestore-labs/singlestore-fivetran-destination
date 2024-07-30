@@ -1,5 +1,7 @@
 package com.singlestore.fivetran.destination;
 
+import java.io.ByteArrayInputStream;
+import java.io.StringBufferInputStream;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -177,7 +179,7 @@ public class DeleteWriterTest extends IntegrationTestBase {
             w.setHeader(List.of("id"));
             for (Integer i = 0; i < 20000; i++) {
                 w.writeRow(List.of(i.toString()));
-                if (i % 10000 == 0) {
+                if (i % 1000 == 0) {
                     w.commit();
                 }
             }
@@ -188,6 +190,9 @@ public class DeleteWriterTest extends IntegrationTestBase {
             d.setHeader(List.of("id"));
             for (Integer i = 0; i < 10000; i++) {
                 d.writeRow(List.of(i.toString()));
+                if (i % 1000 == 0) {
+                    d.commit();
+                }
             }
             d.commit();
         }
@@ -228,5 +233,39 @@ public class DeleteWriterTest extends IntegrationTestBase {
         }
 
         checkResult("SELECT * FROM `allBytes`", Arrays.asList());
+    }
+
+    @Test
+    public void batchSize() throws Exception {
+        try (Connection conn = JDBCUtil.createConnection(conf);
+                Statement stmt = conn.createStatement()) {
+            stmt.execute(String.format("USE %s", database));
+            stmt.execute("CREATE TABLE batchSize(id INT PRIMARY KEY)");
+
+            CsvFileParams params = CsvFileParams.newBuilder().setNullString("NULL").build();
+            Table t = JDBCUtil.getTable(conf, database, "batchSize", "batchSize");
+            LoadDataWriter w = new LoadDataWriter(conn, database, t.getName(), t.getColumnsList(),
+                    params, null, 1000);
+            StringBuilder data = new StringBuilder("id\n");
+            for (Integer i = 0; i < 20000; i++) {
+                data.append(i.toString() + "\n");
+            }
+            w.write(null, new ByteArrayInputStream(data.toString().getBytes()));
+
+            DeleteWriter d = new DeleteWriter(conn, database, t.getName(), t.getColumnsList(),
+                    params, null, 1010);
+            data = new StringBuilder("id\n");
+            for (Integer i = 0; i < 10000; i++) {
+                data.append(i.toString() + "\n");
+            }
+            d.write(null, new ByteArrayInputStream(data.toString().getBytes()));
+        }
+
+        List<List<String>> res = new ArrayList<>();
+        for (Integer i = 10000; i < 20000; i++) {
+            res.add(Arrays.asList(i.toString()));
+        }
+
+        checkResult("SELECT * FROM `bigDelete` ORDER BY id", res);
     }
 }
