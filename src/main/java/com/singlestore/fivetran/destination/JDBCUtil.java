@@ -366,7 +366,7 @@ public class JDBCUtil {
             case XML:
             case STRING:
             default:
-                return "TEXT";
+                return "TEXT CHARACTER SET utf8mb4";
         }
     }
 
