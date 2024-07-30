@@ -32,15 +32,17 @@ abstract public class Writer {
     List<Column> columns;
     CsvFileParams params;
     Map<String, ByteString> secretKeys;
+    Integer batchSize;
 
     public Writer(Connection conn, String database, String table, List<Column> columns,
-            CsvFileParams params, Map<String, ByteString> secretKeys) {
+            CsvFileParams params, Map<String, ByteString> secretKeys, Integer batchSize) {
         this.conn = conn;
         this.database = database;
         this.columns = columns;
         this.table = table;
         this.params = params;
         this.secretKeys = secretKeys;
+        this.batchSize = batchSize;
     }
 
     abstract public void setHeader(List<String> header) throws SQLException;
@@ -102,9 +104,16 @@ abstract public class Writer {
                 setHeader(header);
 
                 String[] tokens;
+                int rowsInBatch = 0;
                 while ((tokens = csvReader.readNext()) != null) {
                     List<String> row = new ArrayList<>(Arrays.asList(tokens));
                     writeRow(row);
+                    rowsInBatch++;
+                    if (rowsInBatch == batchSize) {
+                        commit();
+                        setHeader(header);
+                        rowsInBatch = 0;
+                    }
                 }
             }
 

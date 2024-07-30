@@ -66,6 +66,11 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
                                         "Additional JDBC parameters to use with connection string to SingleStore server.\n"
                                                 + "Format: 'param1=value1; param2 = value2; ...'.\n"
                                                 + "The supported parameters are available in the https://docs.singlestore.com/cloud/developer-resources/connect-with-application-development-tools/connect-with-java-jdbc/the-singlestore-jdbc-driver/#connection-string-parameters .")
+                                .setTextField(TextField.PlainText).build(),
+                        FormField.newBuilder().setName("batch.size").setLabel("Batch Size")
+                                .setRequired(false)
+                                .setDescription(
+                                        "Maximum number of rows that will be changed by a query. Default is 10000")
                                 .setTextField(TextField.PlainText).build()))
                 .addAllTests(Collections.singletonList(ConfigurationTest.newBuilder()
                         .setName("connect").setLabel("Tests connection").build()))
@@ -234,21 +239,24 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
                 throw new Exception("No primary key found");
             }
 
-            LoadDataWriter w = new LoadDataWriter(conn, database, table,
-                    request.getTable().getColumnsList(), request.getCsv(), request.getKeysMap());
+            LoadDataWriter w =
+                    new LoadDataWriter(conn, database, table, request.getTable().getColumnsList(),
+                            request.getCsv(), request.getKeysMap(), conf.batchSize());
             for (String file : request.getReplaceFilesList()) {
                 w.write(file);
             }
 
-            UpdateWriter u = new UpdateWriter(conn, database, table,
-                    request.getTable().getColumnsList(), request.getCsv(), request.getKeysMap());
+            UpdateWriter u =
+                    new UpdateWriter(conn, database, table, request.getTable().getColumnsList(),
+                            request.getCsv(), request.getKeysMap(), conf.batchSize());
             for (String file : request.getUpdateFilesList()) {
                 u.write(file);
             }
 
 
-            DeleteWriter d = new DeleteWriter(conn, database, table,
-                    request.getTable().getColumnsList(), request.getCsv(), request.getKeysMap());
+            DeleteWriter d =
+                    new DeleteWriter(conn, database, table, request.getTable().getColumnsList(),
+                            request.getCsv(), request.getKeysMap(), conf.batchSize());
             for (String file : request.getDeleteFilesList()) {
                 d.write(file);
             }

@@ -27,7 +27,7 @@ public class UpdateWriterTets extends IntegrationTestBase {
         try (Connection conn = JDBCUtil.createConnection(conf)) {
             Table allTypesTable = JDBCUtil.getTable(conf, database, "allTypesTable", "allTypesTable");
             CsvFileParams params = CsvFileParams.newBuilder().setNullString("NULL").build();
-            LoadDataWriter w = new LoadDataWriter(conn, database, allTypesTable.getName(), allTypesTable.getColumnsList(), params, null);
+            LoadDataWriter w = new LoadDataWriter(conn, database, allTypesTable.getName(), allTypesTable.getColumnsList(), params, null, 123);
             w.setHeader(allTypesColumns);
             w.writeRow(List.of("1", "FALSE", "false", "", "-128", "-32768", "-8388608",
                     "-2147483648", "-2147483648", "-9223372036854775808", "-100.1", "-1000.01",
@@ -40,7 +40,7 @@ public class UpdateWriterTets extends IntegrationTestBase {
                     "POLYGON((0 0, 0 1, 1 1, 0 0))", "POINT(-74.044514 40.689244)"));
             w.commit();
 
-            UpdateWriter u = new UpdateWriter(conn, database, allTypesTable.getName(), allTypesTable.getColumnsList(), params, null);
+            UpdateWriter u = new UpdateWriter(conn, database, allTypesTable.getName(), allTypesTable.getColumnsList(), params, null, 123);
             u.setHeader(allTypesColumns);
             u.writeRow(List.of("1", "TRUE", "true", "MTIzNDU2Nzg=", "127", "32767", "8388607",
                     "2147483647", "2147483647", "9223372036854775807", "100.1", "1000.01",
@@ -81,7 +81,7 @@ public class UpdateWriterTets extends IntegrationTestBase {
             CsvFileParams params = CsvFileParams.newBuilder().setNullString("NULL")
                     .setUnmodifiedString("unm").build();
 
-            UpdateWriter u = new UpdateWriter(conn, database, t.getName(), t.getColumnsList(), params, null);
+            UpdateWriter u = new UpdateWriter(conn, database, t.getName(), t.getColumnsList(), params, null, 123);
             u.setHeader(List.of("id", "a", "b"));
             u.writeRow(List.of("4", "unm", "1"));
             u.writeRow(List.of("7", "10", "unm"));
@@ -109,12 +109,12 @@ public class UpdateWriterTets extends IntegrationTestBase {
             stmt.executeQuery("CREATE TABLE allBytes(a BLOB PRIMARY KEY, b INT)");
             Table allBytesTable = JDBCUtil.getTable(conf, database, "allBytes", "allBytes");
             CsvFileParams params = CsvFileParams.newBuilder().setNullString("NULL").build();
-            LoadDataWriter w = new LoadDataWriter(conn, database, allBytesTable.getName(), allBytesTable.getColumnsList(), params, null);
+            LoadDataWriter w = new LoadDataWriter(conn, database, allBytesTable.getName(), allBytesTable.getColumnsList(), params, null, 123);
             w.setHeader(List.of("a", "b"));
             w.writeRow(List.of(dataBase64, "1"));
             w.commit();
 
-            UpdateWriter u = new UpdateWriter(conn, database, allBytesTable.getName(), allBytesTable.getColumnsList(), params, null);
+            UpdateWriter u = new UpdateWriter(conn, database, allBytesTable.getName(), allBytesTable.getColumnsList(), params, null, 123);
             u.setHeader(List.of("a", "b"));
             u.writeRow(List.of(dataBase64, "2"));
             u.commit();
