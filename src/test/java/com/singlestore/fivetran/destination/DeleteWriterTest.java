@@ -266,6 +266,6 @@ public class DeleteWriterTest extends IntegrationTestBase {
             res.add(Arrays.asList(i.toString()));
         }
 
-        checkResult("SELECT * FROM `bigDelete` ORDER BY id", res);
+        checkResult("SELECT * FROM `batchSize` ORDER BY id", res);
     }
 }
