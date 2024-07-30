@@ -107,6 +107,8 @@ abstract public class Writer {
                     writeRow(row);
                 }
             }
+
+            commit();
         }
     }
 

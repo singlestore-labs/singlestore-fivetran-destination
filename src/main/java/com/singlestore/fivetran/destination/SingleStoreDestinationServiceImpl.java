@@ -26,13 +26,14 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
                                 .setTextField(TextField.PlainText).build(),
                         FormField.newBuilder().setName("port").setLabel("Port").setRequired(true)
                                 .setTextField(TextField.PlainText).build(),
-                        FormField.newBuilder().setName("database").setLabel("Database").setRequired(false)
+                        FormField.newBuilder().setName("database").setLabel("Database")
+                                .setRequired(false)
                                 .setDescription(
-                                        "SingleStore database in which data should be written.\n" +
-                                                "If this option is specified, data will be written to a single database.\n" +
-                                                "Each table name will consist of Fivetran schema name and table name (For example: `<schema>__<table>`).\n" +
-                                                "If this option is not specified, appropriate SingleStore database will be created for each schema.\n" +
-                                                "'CREATE DATABASE' permissions are required in this case.")
+                                        "SingleStore database in which data should be written.\n"
+                                                + "If this option is specified, data will be written to a single database.\n"
+                                                + "Each table name will consist of Fivetran schema name and table name (For example: `<schema>__<table>`).\n"
+                                                + "If this option is not specified, appropriate SingleStore database will be created for each schema.\n"
+                                                + "'CREATE DATABASE' permissions are required in this case.")
                                 .setTextField(TextField.PlainText).build(),
                         FormField.newBuilder().setName("user").setLabel("Username")
                                 .setRequired(true).setTextField(TextField.PlainText).build(),
@@ -145,12 +146,11 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
             responseObserver.onCompleted();
         } catch (Exception e) {
             String database = JDBCUtil.getDatabaseName(conf, request.getSchemaName());
-            String table = JDBCUtil.getTableName(conf, request.getSchemaName(), request.getTable().getName());
+            String table = JDBCUtil.getTableName(conf, request.getSchemaName(),
+                    request.getTable().getName());
 
-            logger.warn(
-                    String.format("CreateTable failed for %s", JDBCUtil
-                            .escapeTable(database, table)),
-                    e);
+            logger.warn(String.format("CreateTable failed for %s",
+                    JDBCUtil.escapeTable(database, table)), e);
 
             responseObserver.onNext(CreateTableResponse.newBuilder().setSuccess(false)
                     .setFailure(e.getMessage()).build());
@@ -176,11 +176,10 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
             responseObserver.onCompleted();
         } catch (Exception e) {
             String database = JDBCUtil.getDatabaseName(conf, request.getSchemaName());
-            String table = JDBCUtil.getTableName(conf, request.getSchemaName(), request.getTable().getName());
-            logger.warn(
-                    String.format("AlterTable failed for %s", JDBCUtil
-                            .escapeTable(database, table)),
-                    e);
+            String table = JDBCUtil.getTableName(conf, request.getSchemaName(),
+                    request.getTable().getName());
+            logger.warn(String.format("AlterTable failed for %s",
+                    JDBCUtil.escapeTable(database, table)), e);
 
             responseObserver.onNext(AlterTableResponse.newBuilder().setSuccess(false)
                     .setFailure(e.getMessage()).build());
@@ -226,7 +225,8 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
             StreamObserver<WriteBatchResponse> responseObserver) {
         SingleStoreConfiguration conf = new SingleStoreConfiguration(request.getConfigurationMap());
         String database = JDBCUtil.getDatabaseName(conf, request.getSchemaName());
-        String table = JDBCUtil.getTableName(conf, request.getSchemaName(), request.getTable().getName());
+        String table =
+                JDBCUtil.getTableName(conf, request.getSchemaName(), request.getTable().getName());
 
         try (Connection conn = JDBCUtil.createConnection(conf);) {
             if (request.getTable().getColumnsList().stream()
@@ -234,35 +234,30 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
                 throw new Exception("No primary key found");
             }
 
-            LoadDataWriter w = new LoadDataWriter(conn, database, table, request.getTable().getColumnsList(),
-                    request.getCsv(), request.getKeysMap());
+            LoadDataWriter w = new LoadDataWriter(conn, database, table,
+                    request.getTable().getColumnsList(), request.getCsv(), request.getKeysMap());
             for (String file : request.getReplaceFilesList()) {
                 w.write(file);
             }
-            w.commit();
 
-            UpdateWriter u = new UpdateWriter(conn, database, table, request.getTable().getColumnsList(),
-                    request.getCsv(), request.getKeysMap());
+            UpdateWriter u = new UpdateWriter(conn, database, table,
+                    request.getTable().getColumnsList(), request.getCsv(), request.getKeysMap());
             for (String file : request.getUpdateFilesList()) {
                 u.write(file);
             }
-            u.commit();
 
 
-            DeleteWriter d = new DeleteWriter(conn, database, table, request.getTable().getColumnsList(),
-                    request.getCsv(), request.getKeysMap());
+            DeleteWriter d = new DeleteWriter(conn, database, table,
+                    request.getTable().getColumnsList(), request.getCsv(), request.getKeysMap());
             for (String file : request.getDeleteFilesList()) {
                 d.write(file);
             }
-            d.commit();
 
             responseObserver.onNext(WriteBatchResponse.newBuilder().setSuccess(true).build());
             responseObserver.onCompleted();
         } catch (Exception e) {
-            logger.warn(
-                    String.format("WriteBatch failed for %s", JDBCUtil
-                            .escapeTable(database, table)),
-                    e);
+            logger.warn(String.format("WriteBatch failed for %s",
+                    JDBCUtil.escapeTable(database, table)), e);
 
             responseObserver.onNext(WriteBatchResponse.newBuilder().setSuccess(false)
                     .setFailure(e.getMessage()).build());
