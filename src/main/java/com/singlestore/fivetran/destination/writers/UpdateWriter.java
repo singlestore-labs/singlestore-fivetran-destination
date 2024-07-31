@@ -11,7 +11,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-// TODO: PLAT-6897 allow to configure batch size in writers
 public class UpdateWriter extends Writer {
     public UpdateWriter(Connection conn, String database, String table, List<Column> columns,
             CsvFileParams params, Map<String, ByteString> secretKeys, Integer batchSize) {
