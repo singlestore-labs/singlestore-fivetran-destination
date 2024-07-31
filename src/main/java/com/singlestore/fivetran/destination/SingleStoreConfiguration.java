@@ -11,6 +11,7 @@ public class SingleStoreConfiguration {
     private final String sslMode;
     private final String sslServerCert;
     private final String driverParameters;
+    private final Integer batchSize;
 
     SingleStoreConfiguration(Map<String, String> conf) {
         this.host = conf.get("host");
@@ -20,7 +21,8 @@ public class SingleStoreConfiguration {
         this.password = conf.get("password");
         this.sslMode = conf.get("ssl.mode");
         this.sslServerCert = conf.get("ssl.server.cert");
-        this.driverParameters = conf.get("driverParameters");
+        this.driverParameters = conf.get("driver.parameters");
+        this.batchSize = Integer.valueOf(conf.getOrDefault("batchSize", "10000"));
     }
 
     public String host() {
@@ -53,5 +55,9 @@ public class SingleStoreConfiguration {
 
     public String driverParameters() {
         return driverParameters;
+    }
+
+    public Integer batchSize() {
+        return batchSize;
     }
 }

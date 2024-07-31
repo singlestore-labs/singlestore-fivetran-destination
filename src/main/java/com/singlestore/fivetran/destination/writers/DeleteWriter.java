@@ -4,7 +4,6 @@ import com.google.protobuf.ByteString;
 import com.singlestore.fivetran.destination.JDBCUtil;
 import fivetran_sdk.Column;
 import fivetran_sdk.CsvFileParams;
-import fivetran_sdk.Table;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -14,17 +13,13 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 public class DeleteWriter extends Writer {
-
-    // TODO: PLAT-6897 make batch size configurable
-    final int BATCH_SIZE = 1000;
-
     List<Integer> pkIds = new ArrayList<>();
     List<Column> pkColumns = new ArrayList<>();
-    List<List<String>> batch = new ArrayList<>();
+    List<List<String>> rows = new ArrayList<>();
 
-    public DeleteWriter(Connection conn, String database, String table, List<Column> columns, CsvFileParams params,
-            Map<String, ByteString> secretKeys) {
-        super(conn, database, table, columns, params, secretKeys);
+    public DeleteWriter(Connection conn, String database, String table, List<Column> columns,
+            CsvFileParams params, Map<String, ByteString> secretKeys, Integer batchSize) {
+        super(conn, database, table, columns, params, secretKeys, batchSize);
     }
 
     @Override
@@ -47,37 +42,35 @@ public class DeleteWriter extends Writer {
 
     @Override
     public void writeRow(List<String> row) throws SQLException {
-        batch.add(row);
-        if (batch.size() == BATCH_SIZE) {
-            processBatch();
-        }
+        rows.add(row);
     }
 
-    private void processBatch() throws SQLException {
-        if (batch.isEmpty()) {
+    @Override
+    public void commit() throws SQLException {
+        if (rows.isEmpty()) {
             return;
         }
 
-        StringBuilder query = new StringBuilder(String.format("DELETE FROM %s WHERE ",
-                JDBCUtil.escapeTable(database, table)));
+        StringBuilder query = new StringBuilder(
+                String.format("DELETE FROM %s WHERE ", JDBCUtil.escapeTable(database, table)));
 
         String condition = pkColumns.stream()
                 .map(column -> String.format("%s = ?", JDBCUtil.escapeIdentifier(column.getName())))
                 .collect(Collectors.joining(" AND "));
 
-        for (int i = 0; i < batch.size(); i++) {
+        for (int i = 0; i < rows.size(); i++) {
             query.append("(");
             query.append(condition);
             query.append(")");
 
-            if (i != batch.size() - 1) {
+            if (i != rows.size() - 1) {
                 query.append(" OR ");
             }
         }
 
         try (PreparedStatement stmt = conn.prepareStatement(query.toString())) {
-            for (int i = 0; i < batch.size(); i++) {
-                List<String> row = batch.get(i);
+            for (int i = 0; i < rows.size(); i++) {
+                List<String> row = rows.get(i);
                 for (int j = 0; j < pkIds.size(); j++) {
                     int paramIndex = i * pkIds.size() + j + 1;
                     String value = row.get(pkIds.get(j));
@@ -89,11 +82,6 @@ public class DeleteWriter extends Writer {
             stmt.execute();
         }
 
-        batch.clear();
-    }
-
-    @Override
-    public void commit() throws SQLException {
-        processBatch();
+        rows.clear();
     }
 }

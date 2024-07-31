@@ -1,5 +1,7 @@
 package com.singlestore.fivetran.destination;
 
+import java.io.ByteArrayInputStream;
+import java.io.StringBufferInputStream;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -100,10 +102,11 @@ public class DeleteWriterTest extends IntegrationTestBase {
                     "  )\n" + //
                     ") AUTOSTATS_CARDINALITY_MODE=PERIODIC AUTOSTATS_HISTOGRAM_MODE=CREATE SQL_MODE='STRICT_ALL_TABLES'");
 
-            Table allTypesTableBigKey = JDBCUtil.getTable(conf, database, "allTypesTableBigKey", "allTypesTableBigKey");
+            Table allTypesTableBigKey =
+                    JDBCUtil.getTable(conf, database, "allTypesTableBigKey", "allTypesTableBigKey");
             CsvFileParams params = CsvFileParams.newBuilder().setNullString("NULL").build();
-            LoadDataWriter w =
-                    new LoadDataWriter(conn, database, allTypesTableBigKey.getName(), allTypesTableBigKey.getColumnsList(), params, null);
+            LoadDataWriter w = new LoadDataWriter(conn, database, allTypesTableBigKey.getName(),
+                    allTypesTableBigKey.getColumnsList(), params, null, 123);
             w.setHeader(allTypesColumns);
             w.writeRow(List.of("1", "FALSE", "false", "", "-128", "-32768", "-8388608",
                     "-2147483648", "-2147483648", "-9223372036854775808", "-100.1", "-1000.01",
@@ -116,7 +119,8 @@ public class DeleteWriterTest extends IntegrationTestBase {
                     "POLYGON((0 0, 0 1, 1 1, 0 0))", "POINT(-74.044514 40.689244)"));
             w.commit();
 
-            DeleteWriter d = new DeleteWriter(conn, database, allTypesTableBigKey.getName(), allTypesTableBigKey.getColumnsList(), params, null);
+            DeleteWriter d = new DeleteWriter(conn, database, allTypesTableBigKey.getName(),
+                    allTypesTableBigKey.getColumnsList(), params, null, 123);
             d.setHeader(allTypesColumns);
             d.writeRow(List.of("1", "FALSE", "false", "", "-128", "-32768", "-8388608",
                     "-2147483648", "-2147483648", "-9223372036854775808", "-100.1", "-1000.01",
@@ -148,7 +152,8 @@ public class DeleteWriterTest extends IntegrationTestBase {
             CsvFileParams params = CsvFileParams.newBuilder().setNullString("NULL")
                     .setUnmodifiedString("unm").build();
 
-            DeleteWriter d = new DeleteWriter(conn, database, t.getName(), t.getColumnsList(), params, null);
+            DeleteWriter d = new DeleteWriter(conn, database, t.getName(), t.getColumnsList(),
+                    params, null, 123);
             d.setHeader(List.of("id", "a", "b"));
             d.writeRow(List.of("4", "unm", "unm"));
             d.writeRow(List.of("7", "unm", "unm"));
@@ -169,17 +174,27 @@ public class DeleteWriterTest extends IntegrationTestBase {
 
             CsvFileParams params = CsvFileParams.newBuilder().setNullString("NULL").build();
             Table t = JDBCUtil.getTable(conf, database, "bigDelete", "bigDelete");
-            LoadDataWriter w = new LoadDataWriter(conn, database, t.getName(), t.getColumnsList(), params, null);
+            LoadDataWriter w = new LoadDataWriter(conn, database, t.getName(), t.getColumnsList(),
+                    params, null, 123);
             w.setHeader(List.of("id"));
             for (Integer i = 0; i < 20000; i++) {
                 w.writeRow(List.of(i.toString()));
+                if (i % 1000 == 0) {
+                    w.commit();
+                    w.setHeader(List.of("id"));
+                }
             }
             w.commit();
 
-            DeleteWriter d = new DeleteWriter(conn, database, t.getName(), t.getColumnsList(), params, null);
+            DeleteWriter d = new DeleteWriter(conn, database, t.getName(), t.getColumnsList(),
+                    params, null, 123);
             d.setHeader(List.of("id"));
             for (Integer i = 0; i < 10000; i++) {
                 d.writeRow(List.of(i.toString()));
+                if (i % 1000 == 0) {
+                    d.commit();
+                    d.setHeader(List.of("id"));
+                }
             }
             d.commit();
         }
@@ -206,17 +221,53 @@ public class DeleteWriterTest extends IntegrationTestBase {
             stmt.executeQuery("CREATE TABLE allBytes(a BLOB PRIMARY KEY)");
             Table allBytesTable = JDBCUtil.getTable(conf, database, "allBytes", "allBytes");
             CsvFileParams params = CsvFileParams.newBuilder().setNullString("NULL").build();
-            LoadDataWriter w = new LoadDataWriter(conn, database, allBytesTable.getName(), allBytesTable.getColumnsList(), params, null);
+            LoadDataWriter w = new LoadDataWriter(conn, database, allBytesTable.getName(),
+                    allBytesTable.getColumnsList(), params, null, 100);
             w.setHeader(List.of("a"));
             w.writeRow(List.of(dataBase64));
             w.commit();
 
-            DeleteWriter d = new DeleteWriter(conn, database, allBytesTable.getName(), allBytesTable.getColumnsList(), params, null);
+            DeleteWriter d = new DeleteWriter(conn, database, allBytesTable.getName(),
+                    allBytesTable.getColumnsList(), params, null, 123);
             d.setHeader(List.of("a"));
             d.writeRow(List.of(dataBase64));
             d.commit();
         }
 
         checkResult("SELECT * FROM `allBytes`", Arrays.asList());
+    }
+
+    @Test
+    public void batchSize() throws Exception {
+        try (Connection conn = JDBCUtil.createConnection(conf);
+                Statement stmt = conn.createStatement()) {
+            stmt.execute(String.format("USE %s", database));
+            stmt.execute("CREATE TABLE batchSize(id INT PRIMARY KEY)");
+
+            CsvFileParams params = CsvFileParams.newBuilder().setNullString("NULL").build();
+            Table t = JDBCUtil.getTable(conf, database, "batchSize", "batchSize");
+            LoadDataWriter w = new LoadDataWriter(conn, database, t.getName(), t.getColumnsList(),
+                    params, null, 1000);
+            StringBuilder data = new StringBuilder("id\n");
+            for (Integer i = 0; i < 20000; i++) {
+                data.append(i.toString() + "\n");
+            }
+            w.write(null, new ByteArrayInputStream(data.toString().getBytes()));
+
+            DeleteWriter d = new DeleteWriter(conn, database, t.getName(), t.getColumnsList(),
+                    params, null, 1010);
+            data = new StringBuilder("id\n");
+            for (Integer i = 0; i < 10000; i++) {
+                data.append(i.toString() + "\n");
+            }
+            d.write(null, new ByteArrayInputStream(data.toString().getBytes()));
+        }
+
+        List<List<String>> res = new ArrayList<>();
+        for (Integer i = 10000; i < 20000; i++) {
+            res.add(Arrays.asList(i.toString()));
+        }
+
+        checkResult("SELECT * FROM `batchSize` ORDER BY id", res);
     }
 }

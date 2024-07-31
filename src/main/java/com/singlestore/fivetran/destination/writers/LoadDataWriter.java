@@ -6,17 +6,14 @@ import com.singlestore.fivetran.destination.JDBCUtil;
 import fivetran_sdk.Column;
 import fivetran_sdk.CsvFileParams;
 import fivetran_sdk.DataType;
-import fivetran_sdk.Table;
 
 import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
-import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,22 +22,22 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-// TODO: PLAT-6897 allow to configure batch size in writers
 public class LoadDataWriter extends Writer {
     private static final Logger logger = LoggerFactory.getLogger(JDBCUtil.class);
 
     final int BUFFER_SIZE = 524288;
 
-    List<Column> headerColumns = new ArrayList<>();
-    PipedOutputStream outputStream = new PipedOutputStream();
-    PipedInputStream inputStream = new PipedInputStream(outputStream, BUFFER_SIZE);
+    List<Column> headerColumns;
+    PipedOutputStream outputStream;
+    PipedInputStream inputStream;
     Thread t;
     final SQLException[] queryException = new SQLException[1];
     Statement stmt;
 
-    public LoadDataWriter(Connection conn, String database, String table, List<Column> columns, CsvFileParams params,
-            Map<String, ByteString> secretKeys) throws IOException {
-        super(conn, database, table, columns, params, secretKeys);
+    public LoadDataWriter(Connection conn, String database, String table, List<Column> columns,
+            CsvFileParams params, Map<String, ByteString> secretKeys, Integer batchSize)
+            throws IOException {
+        super(conn, database, table, columns, params, secretKeys, batchSize);
     }
 
     private String tmpColumnName(String name) {
@@ -48,7 +45,12 @@ public class LoadDataWriter extends Writer {
     }
 
     @Override
-    public void setHeader(List<String> header) throws SQLException {
+    public void setHeader(List<String> header) throws SQLException, IOException {
+        outputStream = new PipedOutputStream();
+        inputStream = new PipedInputStream(outputStream, BUFFER_SIZE);
+        headerColumns = new ArrayList<>();
+        queryException[0] = null;
+
         Map<String, Column> nameToColumn = new HashMap<>();
         for (Column column : columns) {
             nameToColumn.put(column.getName(), column);

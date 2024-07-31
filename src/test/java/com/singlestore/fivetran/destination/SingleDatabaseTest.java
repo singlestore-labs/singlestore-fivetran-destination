@@ -74,7 +74,7 @@ public class SingleDatabaseTest extends IntegrationTestBase {
 
             // WRITE DATA
             CsvFileParams params = CsvFileParams.newBuilder().setNullString("NULL").build();
-            LoadDataWriter w = new LoadDataWriter(conn, database, "schema__checkSingleDatabase", t.getColumnsList(), params, null);
+            LoadDataWriter w = new LoadDataWriter(conn, database, "schema__checkSingleDatabase", t.getColumnsList(), params, null, 123);
             w.setHeader(List.of("a", "b", "c"));
             w.writeRow(List.of("1", "2", "2038-01-19 03:14:07.123455"));
             w.writeRow(List.of("3", "4", "2038-01-19 03:14:07.123460"));
@@ -84,7 +84,7 @@ public class SingleDatabaseTest extends IntegrationTestBase {
                     Arrays.asList("3", "4", "2038-01-19 03:14:07.123460")));
 
             // UPDATE DATA
-            UpdateWriter u = new UpdateWriter(conn, database, "schema__checkSingleDatabase", t.getColumnsList(), params, null);
+            UpdateWriter u = new UpdateWriter(conn, database, "schema__checkSingleDatabase", t.getColumnsList(), params, null, 123);
             u.setHeader(List.of("a", "b", "c"));
             u.writeRow(List.of("1", "5", "2038-01-19 03:14:07.123455"));
             u.commit();
@@ -93,7 +93,7 @@ public class SingleDatabaseTest extends IntegrationTestBase {
                     Arrays.asList("3", "4", "2038-01-19 03:14:07.123460")));
 
             // DELETE DATA
-            DeleteWriter d = new DeleteWriter(conn, database, "schema__checkSingleDatabase", t.getColumnsList(), params, null);
+            DeleteWriter d = new DeleteWriter(conn, database, "schema__checkSingleDatabase", t.getColumnsList(), params, null, 123);
             d.setHeader(List.of("a", "b", "c"));
             d.writeRow(List.of("3", "4", "2038-01-19 03:14:07.123460"));
             d.commit();

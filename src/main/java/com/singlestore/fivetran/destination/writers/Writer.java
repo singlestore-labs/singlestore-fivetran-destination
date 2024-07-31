@@ -32,22 +32,24 @@ abstract public class Writer {
     List<Column> columns;
     CsvFileParams params;
     Map<String, ByteString> secretKeys;
+    Integer batchSize;
 
     public Writer(Connection conn, String database, String table, List<Column> columns,
-            CsvFileParams params, Map<String, ByteString> secretKeys) {
+            CsvFileParams params, Map<String, ByteString> secretKeys, Integer batchSize) {
         this.conn = conn;
         this.database = database;
         this.columns = columns;
         this.table = table;
         this.params = params;
         this.secretKeys = secretKeys;
+        this.batchSize = batchSize;
     }
 
-    abstract public void setHeader(List<String> header) throws SQLException;
+    abstract public void setHeader(List<String> header) throws SQLException, IOException;
 
     abstract public void writeRow(List<String> row) throws Exception;
 
-    private IvParameterSpec readIV(FileInputStream is, String file) throws Exception {
+    private IvParameterSpec readIV(InputStream is, String file) throws Exception {
         byte[] b = new byte[16];
         int bytesRead = 0;
         while (bytesRead != b.length) {
@@ -63,7 +65,7 @@ abstract public class Writer {
         return new IvParameterSpec(b);
     }
 
-    private InputStream decodeAES(FileInputStream is, byte[] secretKeyBytes, String file)
+    private InputStream decodeAES(InputStream is, byte[] secretKeyBytes, String file)
             throws Exception {
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 
@@ -76,40 +78,51 @@ abstract public class Writer {
 
     public void write(String file) throws Exception {
         try (FileInputStream is = new FileInputStream(file)) {
-            InputStream decoded = is;
-            if (params.getEncryption() == Encryption.AES) {
-                decoded = decodeAES(is, secretKeys.get(file).toByteArray(), file);
-            }
-
-            InputStream uncompressed = decoded;
-            if (params.getCompression() == Compression.ZSTD) {
-                uncompressed = new ZstdInputStream(decoded);
-            } else if (params.getCompression() == Compression.GZIP) {
-                uncompressed = new GZIPInputStream(decoded);
-            }
-
-            try (CSVReader csvReader =
-                    new CSVReaderBuilder(new BufferedReader(new InputStreamReader(uncompressed)))
-                            .withCSVParser(new CSVParserBuilder().withEscapeChar('\0').build())
-                            .build()) {
-                String[] headerString = csvReader.readNext();
-                if (headerString == null) {
-                    // finish if file is empty
-                    return;
-                }
-
-                List<String> header = new ArrayList<>(Arrays.asList(headerString));
-                setHeader(header);
-
-                String[] tokens;
-                while ((tokens = csvReader.readNext()) != null) {
-                    List<String> row = new ArrayList<>(Arrays.asList(tokens));
-                    writeRow(row);
-                }
-            }
-
-            commit();
+            write(file, is);
         }
+    }
+
+    public void write(String file, InputStream is) throws Exception {
+        InputStream decoded = is;
+        if (params.getEncryption() == Encryption.AES) {
+            decoded = decodeAES(is, secretKeys.get(file).toByteArray(), file);
+        }
+
+        InputStream uncompressed = decoded;
+        if (params.getCompression() == Compression.ZSTD) {
+            uncompressed = new ZstdInputStream(decoded);
+        } else if (params.getCompression() == Compression.GZIP) {
+            uncompressed = new GZIPInputStream(decoded);
+        }
+
+        try (CSVReader csvReader =
+                new CSVReaderBuilder(new BufferedReader(new InputStreamReader(uncompressed)))
+                        .withCSVParser(new CSVParserBuilder().withEscapeChar('\0').build())
+                        .build()) {
+            String[] headerString = csvReader.readNext();
+            if (headerString == null) {
+                // finish if file is empty
+                return;
+            }
+
+            List<String> header = new ArrayList<>(Arrays.asList(headerString));
+            setHeader(header);
+
+            String[] tokens;
+            int rowsInBatch = 0;
+            while ((tokens = csvReader.readNext()) != null) {
+                List<String> row = new ArrayList<>(Arrays.asList(tokens));
+                writeRow(row);
+                rowsInBatch++;
+                if (rowsInBatch == batchSize) {
+                    commit();
+                    setHeader(header);
+                    rowsInBatch = 0;
+                }
+            }
+        }
+
+        commit();
     }
 
     abstract public void commit() throws InterruptedException, IOException, SQLException;

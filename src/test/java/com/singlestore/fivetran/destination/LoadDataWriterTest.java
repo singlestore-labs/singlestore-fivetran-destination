@@ -23,10 +23,11 @@ public class LoadDataWriterTest extends IntegrationTestBase {
         createAllTypesTable();
 
         try (Connection conn = JDBCUtil.createConnection(conf)) {
-            Table allTypesTable = JDBCUtil.getTable(conf, database, "allTypesTable", "allTypesTable");
+            Table allTypesTable =
+                    JDBCUtil.getTable(conf, database, "allTypesTable", "allTypesTable");
             CsvFileParams params = CsvFileParams.newBuilder().setNullString("NULL").build();
             LoadDataWriter w = new LoadDataWriter(conn, database, allTypesTable.getName(),
-                    allTypesTable.getColumnsList(), params, null);
+                    allTypesTable.getColumnsList(), params, null, 123);
             w.setHeader(List.of("id", "boolColumn", "booleanColumn", "bitColumn", "tinyintColumn",
                     "smallintColumn", "mediumintColumn", "intColumn", "integerColumn",
                     "bigintColumn", "floatColumn", "doubleColumn", "realColumn", "dateColumn",
@@ -104,7 +105,8 @@ public class LoadDataWriterTest extends IntegrationTestBase {
             stmt.executeQuery("CREATE TABLE allBytes(a BLOB)");
             Table allBytesTable = JDBCUtil.getTable(conf, database, "allBytes", "allBytes");
             CsvFileParams params = CsvFileParams.newBuilder().setNullString("NULL").build();
-            LoadDataWriter w = new LoadDataWriter(conn, database, allBytesTable.getName(), allBytesTable.getColumnsList(), params, null);
+            LoadDataWriter w = new LoadDataWriter(conn, database, allBytesTable.getName(),
+                    allBytesTable.getColumnsList(), params, null, 123);
             w.setHeader(List.of("a"));
             w.writeRow(List.of(dataBase64));
             w.commit();
