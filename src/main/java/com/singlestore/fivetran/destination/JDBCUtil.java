@@ -43,7 +43,20 @@ public class JDBCUtil {
         }
 
         String url = String.format("jdbc:singlestore://%s:%d", conf.host(), conf.port());
-        return DriverManager.getConnection(url, connectionProps);
+
+        try {
+            return DriverManager.getConnection(url, connectionProps);
+        } catch (SQLException e) {
+            if (e.getErrorCode() == 1046 &&
+                    e.getSQLState().equals("3D000") &&
+                    e.getMessage().contains("In order to use shared tier you need to select a database by default")
+                    && conf.database() != null) {
+                url = String.format("jdbc:singlestore://%s:%d/%s", conf.host(), conf.port(), conf.database());
+                return DriverManager.getConnection(url, connectionProps);
+            }
+
+            throw e;
+        }
     }
 
     private static void putIfNotEmpty(Properties props, String key, String value) {
@@ -174,8 +187,7 @@ public class JDBCUtil {
         SingleStoreConfiguration conf = new SingleStoreConfiguration(request.getConfigurationMap());
 
         String database = JDBCUtil.getDatabaseName(conf, request.getSchemaName());
-        String table =
-                JDBCUtil.getTableName(conf, request.getSchemaName(), request.getTable().getName());
+        String table = JDBCUtil.getTableName(conf, request.getSchemaName(), request.getTable().getName());
 
         Table oldTable = getTable(conf, database, table, request.getTable().getName());
         Table newTable = request.getTable();
@@ -302,8 +314,7 @@ public class JDBCUtil {
     static String generateCreateTableQuery(SingleStoreConfiguration conf, Statement stmt,
             CreateTableRequest request) throws SQLException {
         String database = JDBCUtil.getDatabaseName(conf, request.getSchemaName());
-        String table =
-                JDBCUtil.getTableName(conf, request.getSchemaName(), request.getTable().getName());
+        String table = JDBCUtil.getTableName(conf, request.getSchemaName(), request.getTable().getName());
         String createTableQuery = generateCreateTableQuery(database, table, request.getTable());
 
         if (!checkDatabaseExists(stmt, database)) {
@@ -315,8 +326,8 @@ public class JDBCUtil {
     }
 
     static String getColumnDefinitions(List<Column> columns) {
-        List<String> columnsDefinitions =
-                columns.stream().map(JDBCUtil::getColumnDefinition).collect(Collectors.toList());
+        List<String> columnsDefinitions = columns.stream().map(JDBCUtil::getColumnDefinition)
+                .collect(Collectors.toList());
 
         List<String> primaryKeyColumns = columns.stream().filter(Column::getPrimaryKey)
                 .map(column -> escapeIdentifier(column.getName())).collect(Collectors.toList());
