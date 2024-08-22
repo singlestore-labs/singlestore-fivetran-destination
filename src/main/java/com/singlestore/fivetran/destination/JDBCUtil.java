@@ -16,7 +16,9 @@ public class JDBCUtil {
     static Connection createConnection(SingleStoreConfiguration conf) throws Exception {
         Properties connectionProps = new Properties();
         connectionProps.put("user", conf.user());
-        connectionProps.put("password", conf.password());
+        if (conf.password() != null) {
+            connectionProps.put("password", conf.password());
+        }
         connectionProps.put("allowLocalInfile", "true");
         connectionProps.put("transformedBitIsBoolean", "true");
         connectionProps.put("allowMultiQueries", "true");
@@ -24,12 +26,11 @@ public class JDBCUtil {
                 String.format("_connector_name:%s,_connector_version:%s",
                         "SingleStore Fivetran Destination", VersionProvider.getVersion()));
 
-        if (conf.sslMode() != null) {
-            connectionProps.put("sslMode", conf.sslMode());
-            if (!conf.sslMode().equals("disable")) {
-                putIfNotEmpty(connectionProps, "serverSslCert", conf.sslServerCert());
-            }
+        connectionProps.put("sslMode", conf.sslMode());
+        if (!conf.sslMode().equals("disable")) {
+            putIfNotEmpty(connectionProps, "serverSslCert", conf.sslServerCert());
         }
+        
         String driverParameters = conf.driverParameters();
         if (driverParameters != null) {
             for (String parameter : driverParameters.split(";")) {

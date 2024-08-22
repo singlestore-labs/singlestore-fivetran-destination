@@ -16,13 +16,25 @@ public class SingleStoreConfiguration {
     SingleStoreConfiguration(Map<String, String> conf) {
         this.host = conf.get("host");
         this.port = Integer.valueOf(conf.get("port"));
-        this.database = conf.get("database");
+        this.database = withDefaultNull(conf.get("database"));
         this.user = conf.get("user");
-        this.password = conf.get("password");
-        this.sslMode = conf.get("ssl.mode");
-        this.sslServerCert = conf.get("ssl.server.cert");
-        this.driverParameters = conf.get("driver.parameters");
-        this.batchSize = Integer.valueOf(conf.getOrDefault("batchSize", "10000"));
+        this.password = withDefaultNull(conf.get("password"));
+        this.sslMode = withDefault(conf.get("ssl.mode"), "disable");
+        this.sslServerCert = withDefaultNull(conf.get("ssl.server.cert"));
+        this.driverParameters = withDefaultNull(conf.get("driver.parameters"));
+        this.batchSize = Integer.valueOf(withDefault(conf.get("batch.size"), "10000"));
+    }
+
+    private String withDefault(String s, String def) {
+        if (s == null || s.isEmpty()) {
+            return def;
+        }
+
+        return s;
+    }
+
+    private String withDefaultNull(String s) {
+        return withDefault(s, null);
     }
 
     public String host() {

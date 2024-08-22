@@ -68,6 +68,7 @@ public class DeleteWriter extends Writer {
             }
         }
 
+        System.out.println(query.toString());
         try (PreparedStatement stmt = conn.prepareStatement(query.toString())) {
             for (int i = 0; i < rows.size(); i++) {
                 List<String> row = rows.get(i);
