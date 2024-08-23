@@ -30,7 +30,6 @@ public class JDBCUtil {
         if (!conf.sslMode().equals("disable")) {
             putIfNotEmpty(connectionProps, "serverSslCert", conf.sslServerCert());
         }
-
         String driverParameters = conf.driverParameters();
         if (driverParameters != null) {
             for (String parameter : driverParameters.split(";")) {
