@@ -30,7 +30,6 @@ public class JDBCUtil {
         if (!conf.sslMode().equals("disable")) {
             putIfNotEmpty(connectionProps, "serverSslCert", conf.sslServerCert());
         }
-        
         String driverParameters = conf.driverParameters();
         if (driverParameters != null) {
             for (String parameter : driverParameters.split(";")) {
@@ -43,7 +42,19 @@ public class JDBCUtil {
         }
 
         String url = String.format("jdbc:singlestore://%s:%d", conf.host(), conf.port());
-        return DriverManager.getConnection(url, connectionProps);
+
+        try {
+            return DriverManager.getConnection(url, connectionProps);
+        } catch (SQLException e) {
+            if (e.getErrorCode() == 1046 && e.getSQLState().equals("3D000")
+                    && conf.database() != null) {
+                url = String.format("jdbc:singlestore://%s:%d/%s", conf.host(), conf.port(),
+                        conf.database());
+                return DriverManager.getConnection(url, connectionProps);
+            }
+
+            throw e;
+        }
     }
 
     private static void putIfNotEmpty(Properties props, String key, String value) {
