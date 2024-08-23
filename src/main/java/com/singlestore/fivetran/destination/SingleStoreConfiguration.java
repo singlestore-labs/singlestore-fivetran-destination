@@ -20,9 +20,21 @@ public class SingleStoreConfiguration {
         this.user = conf.get("user");
         this.password = withDefaultNull(conf.get("password"));
         this.sslMode = withDefault(conf.get("ssl.mode"), "disable");
-        this.sslServerCert = withDefaultNull(conf.get("ssl.server.cert"));
+        this.sslServerCert = formatServerCert(withDefaultNull(conf.get("ssl.server.cert")));
         this.driverParameters = withDefaultNull(conf.get("driver.parameters"));
         this.batchSize = Integer.valueOf(withDefault(conf.get("batch.size"), "10000"));
+    }
+
+    private String formatServerCert(String cert) {
+        if (cert == null) {
+            return cert;
+        }
+
+        return cert.replace("-----BEGIN CERTIFICATE-----", "-----BEGIN-CERTIFICATE-----")
+                .replace("-----END CERTIFICATE-----", "-----END-CERTIFICATE-----")
+                .replace(" ", "\n")
+                .replace("-----BEGIN-CERTIFICATE-----", "-----BEGIN CERTIFICATE-----")
+                .replace("-----END-CERTIFICATE-----", "-----END CERTIFICATE-----");
     }
 
     private String withDefault(String s, String def) {
