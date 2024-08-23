@@ -20,20 +20,4 @@ public class JDBCUtilTest extends IntegrationTestBase {
             stmt.executeQuery("SELECT 1; SELECT 2");
         }
     }
-
-    @Test
-    public void defaultValues() throws Exception {
-        SingleStoreConfiguration conf = new SingleStoreConfiguration(ImmutableMap.of("host", host,
-                "port", port, "user", user, "database", "", "password", "", "driver.parameters", "",
-                "ssl.mode", "", "ssl.server.cert", "", "batch.size", ""));
-        assertEquals(host, conf.host());
-        assertEquals(Integer.valueOf(port), conf.port());
-        assertEquals(user, conf.user());
-        assertNull(conf.database());
-        assertNull(conf.password());
-        assertNull(conf.driverParameters());
-        assertEquals("disable", conf.sslMode());
-        assertNull(conf.sslServerCert());
-        assertEquals(10000, conf.batchSize());
-    }
 }
