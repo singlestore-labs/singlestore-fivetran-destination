@@ -1,22 +1,18 @@
-package com.singlestore.fivetran.destination;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+package com.singlestore.fivetran.destination.connector;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
+import com.singlestore.fivetran.destination.connector.writers.LoadDataWriter;
+import fivetran_sdk.v2.*;
 import org.junit.jupiter.api.Test;
 
-import fivetran_sdk.Column;
-import fivetran_sdk.CreateTableRequest;
-import fivetran_sdk.DataType;
-import fivetran_sdk.DecimalParams;
-import fivetran_sdk.Table;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class CreateTableTest extends IntegrationTestBase {
     @Test
@@ -59,10 +55,10 @@ public class CreateTableTest extends IntegrationTestBase {
                 .setTable(allTypesCreateTable).build();
 
         try (Connection conn = JDBCUtil.createConnection(conf);
-                Statement stmt = conn.createStatement();) {
+             Statement stmt = conn.createStatement();) {
             String query = JDBCUtil.generateCreateTableQuery(conf, stmt, request);
             stmt.execute(query);
-            Table result = JDBCUtil.getTable(conf, database, "allTypesCreateTable", "allTypesCreateTable");
+            Table result = JDBCUtil.getTable(conf, database, "allTypesCreateTable", "allTypesCreateTable", testWarningHandle);
             assertEquals("allTypesCreateTable", result.getName());
             List<Column> columns = result.getColumnsList();
 
@@ -129,52 +125,122 @@ public class CreateTableTest extends IntegrationTestBase {
     }
 
     @Test
-    public void scaleAndPrecision() throws SQLException, Exception {
+    public void scaleAndPrecision() throws Exception {
         Table t = Table.newBuilder().setName("scaleAndPrecision").addAllColumns(Arrays.asList(
-                Column.newBuilder().setName("dec1").setType(DataType.DECIMAL).setPrimaryKey(false)
-                        .setDecimal(DecimalParams.newBuilder().setScale(31).setPrecision(38))
-                        .build(),
-                Column.newBuilder().setName("dec2").setType(DataType.DECIMAL).setPrimaryKey(false)
-                        .setDecimal(DecimalParams.newBuilder().setScale(5).setPrecision(10))
-                        .build()))
+                        Column.newBuilder().setName("dec1").setType(DataType.DECIMAL).setPrimaryKey(false)
+                                .setParams(DataTypeParams.newBuilder()
+                                        .setDecimal(DecimalParams.newBuilder().setScale(31).setPrecision(38))
+                                        .build())
+                                .build(),
+                        Column.newBuilder().setName("dec2").setType(DataType.DECIMAL).setPrimaryKey(false)
+                                .setParams(DataTypeParams.newBuilder()
+                                        .setDecimal(DecimalParams.newBuilder().setScale(5).setPrecision(10))
+                                        .build())
+                                .build()))
                 .build();
 
         CreateTableRequest request =
                 CreateTableRequest.newBuilder().setSchemaName(database).setTable(t).build();
 
         try (Connection conn = JDBCUtil.createConnection(conf);
-                Statement stmt = conn.createStatement();) {
+             Statement stmt = conn.createStatement();) {
             String query = JDBCUtil.generateCreateTableQuery(conf, stmt, request);
             stmt.execute(query);
-            Table result = JDBCUtil.getTable(conf, database, "scaleAndPrecision", "scaleAndPrecision");
+            Table result = JDBCUtil.getTable(conf, database, "scaleAndPrecision", "scaleAndPrecision", testWarningHandle);
             assertEquals("scaleAndPrecision", result.getName());
             List<Column> columns = result.getColumnsList();
 
             assertEquals("dec1", columns.get(0).getName());
             assertEquals(DataType.DECIMAL, columns.get(0).getType());
             assertEquals(false, columns.get(0).getPrimaryKey());
-            assertEquals(38, columns.get(0).getDecimal().getPrecision());
-            assertEquals(30, columns.get(0).getDecimal().getScale());
+            assertEquals(38, columns.get(0).getParams().getDecimal().getPrecision());
+            assertEquals(30, columns.get(0).getParams().getDecimal().getScale());
 
             assertEquals("dec2", columns.get(1).getName());
             assertEquals(DataType.DECIMAL, columns.get(1).getType());
             assertEquals(false, columns.get(1).getPrimaryKey());
-            assertEquals(10, columns.get(1).getDecimal().getPrecision());
-            assertEquals(5, columns.get(1).getDecimal().getScale());
+            assertEquals(10, columns.get(1).getParams().getDecimal().getPrecision());
+            assertEquals(5, columns.get(1).getParams().getDecimal().getScale());
         }
     }
 
     @Test
-    public void newDatabase() throws Exception {
-        Table t = Table.newBuilder().setName("newDatabase").addAllColumns(Arrays.asList(Column
-                .newBuilder().setName("a").setType(DataType.INT).setPrimaryKey(false).build()))
+    public void stringByteLength() throws Exception {
+        Table t = Table.newBuilder().setName("stringByteLength").addAllColumns(Arrays.asList(
+                        Column.newBuilder().setName("str1").setType(DataType.STRING).setPrimaryKey(false)
+                                .setParams(DataTypeParams.newBuilder()
+                                        .setStringByteLength(1)
+                                        .build())
+                                .build(),
+                        Column.newBuilder().setName("str2").setType(DataType.STRING).setPrimaryKey(false)
+                                .setParams(DataTypeParams.newBuilder()
+                                        .setStringByteLength(256)
+                                        .build())
+                                .build(),
+                        Column.newBuilder().setName("str3").setType(DataType.STRING).setPrimaryKey(false)
+                                .setParams(DataTypeParams.newBuilder()
+                                        .setStringByteLength(65536)
+                                        .build())
+                                .build(),
+                        Column.newBuilder().setName("str4").setType(DataType.STRING).setPrimaryKey(false)
+                                .setParams(DataTypeParams.newBuilder()
+                                        .setStringByteLength(16777216)
+                                        .build())
+                                .build(),
+                        Column.newBuilder().setName("str5").setType(DataType.STRING).setPrimaryKey(false)
+                                .build())
+                )
                 .build();
 
         CreateTableRequest request =
                 CreateTableRequest.newBuilder().setSchemaName(database).setTable(t).build();
 
         try (Connection conn = JDBCUtil.createConnection(conf);
-                Statement stmt = conn.createStatement();) {
+             Statement stmt = conn.createStatement();) {
+            String query = JDBCUtil.generateCreateTableQuery(conf, stmt, request);
+            stmt.execute(query);
+            Table result = JDBCUtil.getTable(conf, database, "stringByteLength", "stringByteLength", testWarningHandle);
+            assertEquals("stringByteLength", result.getName());
+            List<Column> columns = result.getColumnsList();
+
+            assertEquals("str1", columns.get(0).getName());
+            assertEquals(DataType.STRING, columns.get(0).getType());
+            assertFalse(columns.get(0).getPrimaryKey());
+            assertEquals(255, columns.get(0).getParams().getStringByteLength());
+
+            assertEquals("str2", columns.get(1).getName());
+            assertEquals(DataType.STRING, columns.get(1).getType());
+            assertFalse(columns.get(1).getPrimaryKey());
+            assertEquals(65535, columns.get(1).getParams().getStringByteLength());
+
+            assertEquals("str3", columns.get(2).getName());
+            assertEquals(DataType.STRING, columns.get(2).getType());
+            assertFalse(columns.get(2).getPrimaryKey());
+            assertEquals(16777215, columns.get(2).getParams().getStringByteLength());
+
+            assertEquals("str4", columns.get(3).getName());
+            assertEquals(DataType.STRING, columns.get(3).getType());
+            assertFalse(columns.get(3).getPrimaryKey());
+            assertEquals(Integer.MAX_VALUE, columns.get(3).getParams().getStringByteLength());
+
+            assertEquals("str5", columns.get(4).getName());
+            assertEquals(DataType.STRING, columns.get(4).getType());
+            assertFalse(columns.get(4).getPrimaryKey());
+            assertEquals(65535, columns.get(4).getParams().getStringByteLength());
+        }
+    }
+
+    @Test
+    public void newDatabase() throws Exception {
+        Table t = Table.newBuilder().setName("newDatabase").addAllColumns(Arrays.asList(Column
+                        .newBuilder().setName("a").setType(DataType.INT).setPrimaryKey(false).build()))
+                .build();
+
+        CreateTableRequest request =
+                CreateTableRequest.newBuilder().setSchemaName(database).setTable(t).build();
+
+        try (Connection conn = JDBCUtil.createConnection(conf);
+             Statement stmt = conn.createStatement();) {
             stmt.execute(String.format("DROP DATABASE IF EXISTS %s", database));
             String query = JDBCUtil.generateCreateTableQuery(conf, stmt, request);
             stmt.execute(query);

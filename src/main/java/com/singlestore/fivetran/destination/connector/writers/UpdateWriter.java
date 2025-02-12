@@ -1,9 +1,9 @@
-package com.singlestore.fivetran.destination.writers;
+package com.singlestore.fivetran.destination.connector.writers;
 
 import com.google.protobuf.ByteString;
-import com.singlestore.fivetran.destination.JDBCUtil;
-import fivetran_sdk.Column;
-import fivetran_sdk.CsvFileParams;
+import com.singlestore.fivetran.destination.connector.JDBCUtil;
+import fivetran_sdk.v2.Column;
+import fivetran_sdk.v2.FileParams;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -13,7 +13,7 @@ import java.util.Map;
 
 public class UpdateWriter extends Writer {
     public UpdateWriter(Connection conn, String database, String table, List<Column> columns,
-            CsvFileParams params, Map<String, ByteString> secretKeys, Integer batchSize) {
+            FileParams params, Map<String, ByteString> secretKeys, Integer batchSize) {
         super(conn, database, table, columns, params, secretKeys, batchSize);
     }
 

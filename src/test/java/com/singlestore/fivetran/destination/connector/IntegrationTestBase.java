@@ -1,4 +1,4 @@
-package com.singlestore.fivetran.destination;
+package com.singlestore.fivetran.destination.connector;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -9,6 +9,8 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.List;
 
+import com.singlestore.fivetran.destination.connector.warning_util.WarningHandler;
+import fivetran_sdk.v2.AlterTableResponse;
 import org.junit.jupiter.api.BeforeAll;
 
 import com.google.common.collect.ImmutableMap;
@@ -17,7 +19,7 @@ public class IntegrationTestBase {
     static String host = "127.0.0.1";
     static String port = "3306";
     static String user = "root";
-    static String password = System.getenv("ROOT_PASSWORD");
+    static String password = "1";
     static String database = "db";
 
     static ImmutableMap<String, String> confMap =
@@ -36,7 +38,7 @@ public class IntegrationTestBase {
 
     void createAllTypesTable() throws Exception {
         try (Connection conn = JDBCUtil.createConnection(conf);
-                Statement stmt = conn.createStatement()) {
+             Statement stmt = conn.createStatement()) {
             stmt.execute(String.format("USE `%s`", database));
             stmt.execute("CREATE ROWSTORE TABLE `allTypesTable` (\n" + "  `id` INTEGER,\n"
                     + "  `boolColumn` BOOL,\n" + "  `booleanColumn` BOOLEAN,\n"
@@ -66,7 +68,7 @@ public class IntegrationTestBase {
     @BeforeAll
     static void init() throws Exception {
         try (Connection conn = JDBCUtil.createConnection(conf);
-                Statement stmt = conn.createStatement()) {
+             Statement stmt = conn.createStatement()) {
             stmt.executeQuery(String.format("DROP DATABASE IF EXISTS `%s`", database));
             stmt.executeQuery(String.format("CREATE DATABASE `%s`", database));
         }
@@ -74,7 +76,7 @@ public class IntegrationTestBase {
 
     void checkResult(String query, List<List<String>> expected) throws Exception {
         try (Connection conn = JDBCUtil.createConnection(conf);
-                Statement stmt = conn.createStatement()) {
+             Statement stmt = conn.createStatement()) {
             stmt.execute(String.format("USE `%s`", database));
             try (ResultSet rs = stmt.executeQuery(query)) {
                 for (List<String> row : expected) {
@@ -87,4 +89,21 @@ public class IntegrationTestBase {
             }
         }
     }
+
+
+    WarningHandler<AlterTableResponse> testWarningHandle = new WarningHandler<AlterTableResponse>(null) {
+        @Override
+        public void handle(String message) {
+        }
+
+        @Override
+        public void handle(String message, Throwable t) {
+
+        }
+
+        @Override
+        public AlterTableResponse createWarning(String message) {
+            return null;
+        }
+    };
 }

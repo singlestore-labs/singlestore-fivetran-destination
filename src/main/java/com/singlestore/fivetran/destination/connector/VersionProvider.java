@@ -1,4 +1,4 @@
-package com.singlestore.fivetran.destination;
+package com.singlestore.fivetran.destination.connector;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

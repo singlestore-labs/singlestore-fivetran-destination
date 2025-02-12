@@ -1,4 +1,4 @@
-package com.singlestore.fivetran.destination;
+package com.singlestore.fivetran.destination.connector;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -7,12 +7,12 @@ import java.util.Arrays;
 
 import org.junit.jupiter.api.Test;
 import com.google.protobuf.Timestamp;
-import fivetran_sdk.Column;
-import fivetran_sdk.CreateTableRequest;
-import fivetran_sdk.DataType;
-import fivetran_sdk.SoftTruncate;
-import fivetran_sdk.Table;
-import fivetran_sdk.TruncateRequest;
+import fivetran_sdk.v2.Column;
+import fivetran_sdk.v2.CreateTableRequest;
+import fivetran_sdk.v2.DataType;
+import fivetran_sdk.v2.SoftTruncate;
+import fivetran_sdk.v2.Table;
+import fivetran_sdk.v2.TruncateRequest;
 
 public class TruncateTest extends IntegrationTestBase {
     @Test
