@@ -107,7 +107,7 @@ public class LoadDataWriterTest extends IntegrationTestBase {
             Table allBytesTable = JDBCUtil.getTable(conf, database, "allBytes", "allBytes", testWarningHandle);
             FileParams params = FileParams.newBuilder().setNullString("NULL").build();
             LoadDataWriter w = new LoadDataWriter(conn, database, allBytesTable.getName(),
-                    allBytesTable.getColumnsList(), params, null, 123);
+                    allBytesTable.getColumnsList(), params, null, 123, testWarningHandle);
             w.setHeader(List.of("a"));
             w.writeRow(List.of(dataBase64));
             w.commit();
