@@ -73,5 +73,5 @@ create database tester;
    command use You can use
 
 ```
-docker run --mount type=bind,source=<PATH TO PROJECT>/tester,target=/data -a STDIN -a STDOUT -a STDERR -it -e WORKING_DIR=./data-folder -e GRPC_HOSTNAME=localhost --network=host us-docker.pkg.dev/build-286712/public-docker-us/sdktesters-v2/sdk-tester:<tag> --tester-type destination --port 50052
+docker run --mount type=bind,source=<PATH TO PROJECT>/data-folder,target=/data -a STDIN -a STDOUT -a STDERR -it -e WORKING_DIR=./data-folder -e GRPC_HOSTNAME=localhost --network=host us-docker.pkg.dev/build-286712/public-docker-us/sdktesters-v2/sdk-tester:<tag> --tester-type destination --port 50052
 ```
