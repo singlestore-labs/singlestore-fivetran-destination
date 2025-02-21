@@ -1,6 +1,7 @@
-package com.singlestore.fivetran.destination;
+package com.singlestore.fivetran.destination.connector;
 
-import fivetran_sdk.*;
+import com.singlestore.fivetran.destination.connector.warning_util.WarningHandler;
+import fivetran_sdk.v2.*;
 
 import java.sql.*;
 import java.util.*;
@@ -11,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class JDBCUtil {
+
     private static final Logger logger = LoggerFactory.getLogger(JDBCUtil.class);
 
     static Connection createConnection(SingleStoreConfiguration conf) throws Exception {
@@ -24,7 +26,7 @@ public class JDBCUtil {
         connectionProps.put("allowMultiQueries", "true");
         connectionProps.put("connectionAttributes",
                 String.format("_connector_name:%s,_connector_version:%s",
-                        "SingleStore Fivetran Destination", VersionProvider.getVersion()));
+                        "SingleStore Fivetran Destination Connector", VersionProvider.getVersion()));
 
         connectionProps.put("sslMode", conf.sslMode());
         if (!conf.sslMode().equals("disable")) {
@@ -80,8 +82,9 @@ public class JDBCUtil {
         }
     }
 
-    static Table getTable(SingleStoreConfiguration conf, String database, String table,
-            String originalTableName) throws Exception {
+
+    static <T> Table getTable(SingleStoreConfiguration conf, String database, String table,
+                              String originalTableName, WarningHandler<T> warningHandler) throws Exception {
         try (Connection conn = JDBCUtil.createConnection(conf)) {
             DatabaseMetaData metadata = conn.getMetaData();
 
@@ -90,7 +93,7 @@ public class JDBCUtil {
                     throw new TableNotExistException();
                 }
                 if (tables.next()) {
-                    logger.warn(String.format("Found several tables that match %s name",
+                    warningHandler.handle(String.format("Found several tables that match %s name",
                             JDBCUtil.escapeTable(database, table)));
                 }
             }
@@ -112,10 +115,25 @@ public class JDBCUtil {
                             .setPrimaryKey(
                                     primaryKeys.contains(columnsRS.getString("COLUMN_NAME")));
                     if (c.getType() == DataType.DECIMAL) {
-                        c.setDecimal(DecimalParams.newBuilder()
-                                .setScale(columnsRS.getInt("DECIMAL_DIGITS"))
-                                .setPrecision(columnsRS.getInt("COLUMN_SIZE")).build());
+                        c.setParams(DataTypeParams.newBuilder()
+                                .setDecimal(DecimalParams.newBuilder()
+                                        .setScale(columnsRS.getInt("DECIMAL_DIGITS"))
+                                        .setPrecision(columnsRS.getInt("COLUMN_SIZE")).build())
+                                .build());
                     }
+                    if (c.getType() == DataType.STRING) {
+                        String typeName = columnsRS.getString("TYPE_NAME");
+                        if (typeName.equals("GEOGRAPHYPOINT") || typeName.equals("GEOGRAPHY")) {
+                            c.setParams(DataTypeParams.newBuilder()
+                                    .setStringByteLength(Integer.MAX_VALUE)
+                                    .build());
+                        } else {
+                            c.setParams(DataTypeParams.newBuilder()
+                                    .setStringByteLength(columnsRS.getInt("CHAR_OCTET_LENGTH"))
+                                    .build());
+                        }
+                    }
+
                     columns.add(c.build());
                 }
             }
@@ -181,14 +199,14 @@ public class JDBCUtil {
         return pkColumnNames(t1).equals(pkColumnNames(t2));
     }
 
-    static String generateAlterTableQuery(AlterTableRequest request) throws Exception {
+    static <T> String generateAlterTableQuery(AlterTableRequest request, WarningHandler<T> warningHandler) throws Exception {
         SingleStoreConfiguration conf = new SingleStoreConfiguration(request.getConfigurationMap());
 
         String database = JDBCUtil.getDatabaseName(conf, request.getSchemaName());
         String table =
                 JDBCUtil.getTableName(conf, request.getSchemaName(), request.getTable().getName());
 
-        Table oldTable = getTable(conf, database, table, request.getTable().getName());
+        Table oldTable = getTable(conf, database, table, request.getTable().getName(), warningHandler);
         Table newTable = request.getTable();
         boolean pkChanged = false;
 
@@ -209,8 +227,8 @@ public class JDBCUtil {
                 columnsToAdd.add(column);
             } else {
                 commonColumns.add(column);
-                String oldType = mapDataTypes(oldColumn.getType(), oldColumn.getDecimal());
-                String newType = mapDataTypes(column.getType(), column.getDecimal());
+                String oldType = mapDataTypes(oldColumn.getType(), oldColumn.getParams());
+                String newType = mapDataTypes(column.getType(), column.getParams());
                 if (!oldType.equals(newType)) {
                     if (oldColumn.getPrimaryKey()) {
                         pkChanged = true;
@@ -222,8 +240,7 @@ public class JDBCUtil {
         }
 
         if (pkChanged) {
-            logger.warn(
-                    "Alter table changes the key of the table. This operation is not supported by SingleStore. The table will be recreated from scratch.");
+            warningHandler.handle("Alter table changes the key of the table. This operation is not supported by SingleStore. The table will be recreated from scratch.");
 
             return generateRecreateTableQuery(database, table, newTable, commonColumns);
         } else {
@@ -232,7 +249,7 @@ public class JDBCUtil {
     }
 
     static String generateRecreateTableQuery(String database, String tableName, Table table,
-            List<Column> commonColumns) {
+                                             List<Column> commonColumns) {
         String tmpTableName = tableName + "_alter_tmp";
         String columns = commonColumns.stream().map(column -> escapeIdentifier(column.getName()))
                 .collect(Collectors.joining(", "));
@@ -249,7 +266,7 @@ public class JDBCUtil {
     }
 
     static String generateTruncateTableQuery(SingleStoreConfiguration conf,
-            TruncateRequest request) {
+                                             TruncateRequest request) {
         String query;
         String database = JDBCUtil.getDatabaseName(conf, request.getSchemaName());
         String table = JDBCUtil.getTableName(conf, request.getSchemaName(), request.getTableName());
@@ -269,7 +286,7 @@ public class JDBCUtil {
     }
 
     static String generateAlterTableQuery(String database, String table, List<Column> columnsToAdd,
-            List<Column> columnsToChange) {
+                                          List<Column> columnsToChange) {
         if (columnsToAdd.isEmpty() && columnsToChange.isEmpty()) {
             return null;
         }
@@ -280,11 +297,11 @@ public class JDBCUtil {
             String tmpColName = column.getName() + "_alter_tmp";
             query.append(String.format("ALTER TABLE %s ADD COLUMN %s %s; ",
                     escapeTable(database, table), escapeIdentifier(tmpColName),
-                    mapDataTypes(column.getType(), column.getDecimal())));
+                    mapDataTypes(column.getType(), column.getParams())));
             query.append(
                     String.format("UPDATE %s SET %s = %s :> %s; ", escapeTable(database, table),
                             escapeIdentifier(tmpColName), escapeIdentifier(column.getName()),
-                            mapDataTypes(column.getType(), column.getDecimal())));
+                            mapDataTypes(column.getType(), column.getParams())));
             query.append(String.format("ALTER TABLE %s DROP %s; ", escapeTable(database, table),
                     escapeIdentifier(column.getName())));
             query.append(String.format("ALTER TABLE %s CHANGE %s %s; ",
@@ -311,7 +328,7 @@ public class JDBCUtil {
     }
 
     static String generateCreateTableQuery(SingleStoreConfiguration conf, Statement stmt,
-            CreateTableRequest request) throws SQLException {
+                                           CreateTableRequest request) throws SQLException {
         String database = JDBCUtil.getDatabaseName(conf, request.getSchemaName());
         String table =
                 JDBCUtil.getTableName(conf, request.getSchemaName(), request.getTable().getName());
@@ -342,10 +359,10 @@ public class JDBCUtil {
 
     static String getColumnDefinition(Column col) {
         return String.format("%s %s", escapeIdentifier(col.getName()),
-                mapDataTypes(col.getType(), col.getDecimal()));
+                mapDataTypes(col.getType(), col.getParams()));
     }
 
-    static String mapDataTypes(DataType type, DecimalParams decimal) {
+    static String mapDataTypes(DataType type, DataTypeParams params) {
         switch (type) {
             case BOOLEAN:
                 return "BOOL";
@@ -356,9 +373,10 @@ public class JDBCUtil {
             case LONG:
                 return "BIGINT";
             case DECIMAL:
-                if (decimal != null) {
-                    return String.format("DECIMAL (%d, %d)", decimal.getPrecision(),
-                            Math.min(30, decimal.getScale()));
+                if (params != null && params.getDecimal() != null) {
+                    DecimalParams decimalParams = params.getDecimal();
+                    return String.format("DECIMAL (%d, %d)", decimalParams.getPrecision(),
+                            Math.min(30, decimalParams.getScale()));
                 }
                 return "DECIMAL";
             case FLOAT:
@@ -378,6 +396,19 @@ public class JDBCUtil {
             case XML:
             case STRING:
             default:
+                if (params != null && params.getStringByteLength() != 0) {
+                    int stringByteLength = params.getStringByteLength();
+                    if (stringByteLength <= 255) {
+                        return "TINYTEXT CHARACTER SET utf8mb4";
+                    } else if (stringByteLength <= 65535) {
+                        return "TEXT CHARACTER SET utf8mb4";
+                    } else if (stringByteLength <= 16777215) {
+                        return "MEDIUMTEXT CHARACTER SET utf8mb4";
+                    } else {
+                        return "LONGTEXT CHARACTER SET utf8mb4";
+                    }
+                }
+
                 return "TEXT CHARACTER SET utf8mb4";
         }
     }
@@ -393,7 +424,7 @@ public class JDBCUtil {
     }
 
     public static void setParameter(PreparedStatement stmt, Integer id, DataType type, String value,
-            String nullStr) throws SQLException {
+                                    String nullStr) throws SQLException {
         if (value.equals(nullStr)) {
             stmt.setNull(id, Types.NULL);
         } else {

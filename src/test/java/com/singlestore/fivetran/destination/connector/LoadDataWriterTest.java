@@ -1,8 +1,9 @@
-package com.singlestore.fivetran.destination;
+package com.singlestore.fivetran.destination.connector;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
@@ -12,10 +13,10 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
-import com.singlestore.fivetran.destination.writers.LoadDataWriter;
+import com.singlestore.fivetran.destination.connector.writers.LoadDataWriter;
 
-import fivetran_sdk.CsvFileParams;
-import fivetran_sdk.Table;
+import fivetran_sdk.v2.FileParams;
+import fivetran_sdk.v2.Table;
 
 public class LoadDataWriterTest extends IntegrationTestBase {
     @Test
@@ -24,10 +25,10 @@ public class LoadDataWriterTest extends IntegrationTestBase {
 
         try (Connection conn = JDBCUtil.createConnection(conf)) {
             Table allTypesTable =
-                    JDBCUtil.getTable(conf, database, "allTypesTable", "allTypesTable");
-            CsvFileParams params = CsvFileParams.newBuilder().setNullString("NULL").build();
+                    JDBCUtil.getTable(conf, database, "allTypesTable", "allTypesTable", testWarningHandle);
+            FileParams params = FileParams.newBuilder().setNullString("NULL").build();
             LoadDataWriter w = new LoadDataWriter(conn, database, allTypesTable.getName(),
-                    allTypesTable.getColumnsList(), params, null, 123);
+                    allTypesTable.getColumnsList(), params, null, 123, testWarningHandle);
             w.setHeader(List.of("id", "boolColumn", "booleanColumn", "bitColumn", "tinyintColumn",
                     "smallintColumn", "mediumintColumn", "intColumn", "integerColumn",
                     "bigintColumn", "floatColumn", "doubleColumn", "realColumn", "dateColumn",
@@ -65,15 +66,15 @@ public class LoadDataWriterTest extends IntegrationTestBase {
 
 
         checkResult("SELECT * FROM `allTypesTable` ORDER BY id", Arrays.asList(Arrays.asList("1",
-                "0", "0", "b''", "-128", "-32768", "-8388608", "-2147483648", "-2147483648",
-                "-9223372036854775808", "-100.1", "-1000.01", "-1000.01", "1000-01-01",
-                "-838:59:59", "-838:59:59.000000", "1000-01-01 00:00:00",
-                "1000-01-01 00:00:00.000000", "1970-01-01 00:00:01", "1970-01-01 00:00:01.000000",
-                "1901", "-12345678901234567890123456789012345.123456789012345678901234567891",
-                "123456789", "123456789", "123456789", "a", "abc", "a", "abc", "abc", "abc", "abc",
-                "abc", "abc", "abc", "abc", "abc", "{\"a\":\"b\"}",
-                "POLYGON((1.00000000 1.00000000, 0.00000000 1.00000000, 0.00000000 0.00000000, 1.00000000 1.00000000))",
-                "POINT(-74.04451396 40.68924403)"),
+                        "0", "0", "b''", "-128", "-32768", "-8388608", "-2147483648", "-2147483648",
+                        "-9223372036854775808", "-100.1", "-1000.01", "-1000.01", "1000-01-01",
+                        "-838:59:59", "-838:59:59.000000", "1000-01-01 00:00:00",
+                        "1000-01-01 00:00:00.000000", "1970-01-01 00:00:01", "1970-01-01 00:00:01.000000",
+                        "1901", "-12345678901234567890123456789012345.123456789012345678901234567891",
+                        "123456789", "123456789", "123456789", "a", "abc", "a", "abc", "abc", "abc", "abc",
+                        "abc", "abc", "abc", "abc", "abc", "{\"a\":\"b\"}",
+                        "POLYGON((1.00000000 1.00000000, 0.00000000 1.00000000, 0.00000000 0.00000000, 1.00000000 1.00000000))",
+                        "POINT(-74.04451396 40.68924403)"),
                 Arrays.asList("2", "1", "1",
                         "b'11000100110010001100110011010000110101001101100011011100111000'", "127",
                         "32767", "8388607", "2147483647", "2147483647", "9223372036854775807",
@@ -100,13 +101,13 @@ public class LoadDataWriterTest extends IntegrationTestBase {
 
         String dataBase64 = Base64.getEncoder().encodeToString(data);
         try (Connection conn = JDBCUtil.createConnection(conf);
-                Statement stmt = conn.createStatement();) {
+             Statement stmt = conn.createStatement();) {
             stmt.execute(String.format("USE %s", database));
             stmt.executeQuery("CREATE TABLE allBytes(a BLOB)");
-            Table allBytesTable = JDBCUtil.getTable(conf, database, "allBytes", "allBytes");
-            CsvFileParams params = CsvFileParams.newBuilder().setNullString("NULL").build();
+            Table allBytesTable = JDBCUtil.getTable(conf, database, "allBytes", "allBytes", testWarningHandle);
+            FileParams params = FileParams.newBuilder().setNullString("NULL").build();
             LoadDataWriter w = new LoadDataWriter(conn, database, allBytesTable.getName(),
-                    allBytesTable.getColumnsList(), params, null, 123);
+                    allBytesTable.getColumnsList(), params, null, 123, testWarningHandle);
             w.setHeader(List.of("a"));
             w.writeRow(List.of(dataBase64));
             w.commit();

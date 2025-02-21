@@ -1,9 +1,12 @@
-package com.singlestore.fivetran.destination;
+package com.singlestore.fivetran.destination.connector;
 
-import com.singlestore.fivetran.destination.writers.DeleteWriter;
-import com.singlestore.fivetran.destination.writers.LoadDataWriter;
-import com.singlestore.fivetran.destination.writers.UpdateWriter;
-import fivetran_sdk.*;
+import com.singlestore.fivetran.destination.connector.warning_util.AlterTableWarningHandler;
+import com.singlestore.fivetran.destination.connector.warning_util.DescribeTableWarningHandler;
+import com.singlestore.fivetran.destination.connector.warning_util.WriteBatchWarningHandler;
+import com.singlestore.fivetran.destination.connector.writers.DeleteWriter;
+import com.singlestore.fivetran.destination.connector.writers.LoadDataWriter;
+import com.singlestore.fivetran.destination.connector.writers.UpdateWriter;
+import fivetran_sdk.v2.*;
 import io.grpc.stub.StreamObserver;
 
 import java.sql.*;
@@ -12,13 +15,21 @@ import java.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class SingleStoreDestinationServiceImpl extends DestinationGrpc.DestinationImplBase {
+public class SingleStoreDestinationConnectorServiceImpl extends DestinationConnectorGrpc.DestinationConnectorImplBase {
     private static final Logger logger =
-            LoggerFactory.getLogger(SingleStoreDestinationServiceImpl.class);
+            LoggerFactory.getLogger(SingleStoreDestinationConnectorServiceImpl.class);
 
     @Override
     public void configurationForm(ConfigurationFormRequest request,
-            StreamObserver<ConfigurationFormResponse> responseObserver) {
+                                  StreamObserver<ConfigurationFormResponse> responseObserver) {
+        FormField serverCert = FormField.newBuilder().setName("ssl.server.cert")
+                .setLabel("SSL Server's Certificate").setRequired(false)
+                .setDescription(
+                        "Server's certificate in DER format or the server's CA certificate. "
+                                + "The certificate is added to the trust store, which allows the connection to trust a self-signed certificate.")
+                .setTextField(TextField.PlainText)
+                .build();
+
         responseObserver.onNext(ConfigurationFormResponse.newBuilder()
                 .setSchemaSelectionSupported(true).setTableSelectionSupported(true)
                 .addAllFields(Arrays.asList(
@@ -46,20 +57,51 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
                                                 + "Options include:\n"
                                                 + " * 'disable' to use an unencrypted connection (the default);\n"
                                                 + " * 'trust' to use a secure (encrypted) connection (no certificate and hostname validation);\n"
-                                                + " * 'verify_ca' to use a secure (encrypted) connection but additionally verify the server TLS certificate against the configured Certificate Authority "
+                                                + " * 'verify-ca' to use a secure (encrypted) connection but additionally verify the server TLS certificate against the configured Certificate Authority "
                                                 + "(CA) certificates, or fail if no valid matching CA certificates are found;\n"
                                                 + " * 'verify-full' like 'verify-ca' but additionally verify that the server certificate matches the host to which the connection is attempted.")
                                 .setDropdownField(DropdownField.newBuilder()
-                                        .addDropdownField("disable").addDropdownField("trust")
-                                        .addDropdownField("verify_ca")
+                                        .addDropdownField("disable")
+                                        .addDropdownField("trust")
+                                        .addDropdownField("verify-ca")
                                         .addDropdownField("verify-full"))
                                 .build(),
-                        FormField.newBuilder().setName("ssl.server.cert")
-                                .setLabel("SSL Server's Certificate").setRequired(false)
-                                .setDescription(
-                                        "Server's certificate in DER format or the server's CA certificate. "
-                                                + "The certificate is added to the trust store, which allows the connection to trust a self-signed certificate.")
-                                .setTextField(TextField.PlainText).build(),
+                        FormField.newBuilder()
+                                .setConditionalFields(
+                                        ConditionalFields.newBuilder()
+                                                .setCondition(VisibilityCondition.newBuilder()
+                                                        .setConditionField("ssl.mode")
+                                                        .setStringValue("trust")
+                                                        .build()
+                                                )
+                                                .addAllFields(
+                                                        Collections.singletonList(serverCert))
+                                                .build()
+                                ).build(),
+                        FormField.newBuilder()
+                                .setConditionalFields(
+                                        ConditionalFields.newBuilder()
+                                                .setCondition(VisibilityCondition.newBuilder()
+                                                        .setConditionField("ssl.mode")
+                                                        .setStringValue("verify-ca")
+                                                        .build()
+                                                )
+                                                .addAllFields(
+                                                        Collections.singletonList(serverCert))
+                                                .build()
+                                ).build(),
+                        FormField.newBuilder()
+                                .setConditionalFields(
+                                        ConditionalFields.newBuilder()
+                                                .setCondition(VisibilityCondition.newBuilder()
+                                                        .setConditionField("ssl.mode")
+                                                        .setStringValue("verify-full")
+                                                        .build()
+                                                )
+                                                .addAllFields(
+                                                        Collections.singletonList(serverCert))
+                                                .build()
+                                ).build(),
                         FormField.newBuilder().setName("driver.parameters")
                                 .setLabel("Driver Parameters").setRequired(false)
                                 .setDescription(
@@ -87,12 +129,12 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
             SingleStoreConfiguration configuration =
                     new SingleStoreConfiguration(request.getConfigurationMap());
             try (Connection conn = JDBCUtil.createConnection(configuration);
-                    Statement stmt = conn.createStatement();) {
+                 Statement stmt = conn.createStatement();) {
                 stmt.execute("SELECT 1");
             } catch (Exception e) {
                 logger.warn("Test failed", e);
 
-                responseObserver.onNext(TestResponse.newBuilder().setSuccess(false)
+                responseObserver.onNext(TestResponse.newBuilder()
                         .setFailure(e.getMessage()).build());
                 responseObserver.onCompleted();
                 return;
@@ -105,13 +147,13 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
 
     @Override
     public void describeTable(DescribeTableRequest request,
-            StreamObserver<DescribeTableResponse> responseObserver) {
+                              StreamObserver<DescribeTableResponse> responseObserver) {
         SingleStoreConfiguration conf = new SingleStoreConfiguration(request.getConfigurationMap());
         String database = JDBCUtil.getDatabaseName(conf, request.getSchemaName());
         String table = JDBCUtil.getTableName(conf, request.getSchemaName(), request.getTableName());
 
         try {
-            Table t = JDBCUtil.getTable(conf, database, table, table);
+            Table t = JDBCUtil.getTable(conf, database, table, table, new DescribeTableWarningHandler(responseObserver));
 
             DescribeTableResponse response = DescribeTableResponse.newBuilder().setTable(t).build();
 
@@ -129,20 +171,21 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
             logger.warn(String.format("DescribeTable failed for %s",
                     JDBCUtil.escapeTable(database, table)), e);
 
-            DescribeTableResponse response =
-                    DescribeTableResponse.newBuilder().setFailure(e.getMessage()).build();
-            responseObserver.onNext(response);
+            responseObserver.onNext(DescribeTableResponse.newBuilder()
+                    .setTask(Task.newBuilder()
+                            .setMessage(e.getMessage()).build())
+                    .build());
             responseObserver.onCompleted();
         }
     }
 
     @Override
     public void createTable(CreateTableRequest request,
-            StreamObserver<CreateTableResponse> responseObserver) {
+                            StreamObserver<CreateTableResponse> responseObserver) {
         SingleStoreConfiguration conf = new SingleStoreConfiguration(request.getConfigurationMap());
 
         try (Connection conn = JDBCUtil.createConnection(conf);
-                Statement stmt = conn.createStatement()) {
+             Statement stmt = conn.createStatement()) {
             String query = JDBCUtil.generateCreateTableQuery(conf, stmt, request);
             logger.info(String.format("Executing SQL:\n %s", query));
             stmt.execute(query);
@@ -157,20 +200,25 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
             logger.warn(String.format("CreateTable failed for %s",
                     JDBCUtil.escapeTable(database, table)), e);
 
-            responseObserver.onNext(CreateTableResponse.newBuilder().setSuccess(false)
-                    .setFailure(e.getMessage()).build());
+            responseObserver.onNext(CreateTableResponse.newBuilder()
+                    .setTask(Task.newBuilder()
+                            .setMessage(e.getMessage()).build())
+                    .build());
+            responseObserver.onNext(CreateTableResponse.newBuilder()
+                    .setSuccess(false)
+                    .build());
             responseObserver.onCompleted();
         }
     }
 
     @Override
     public void alterTable(AlterTableRequest request,
-            StreamObserver<AlterTableResponse> responseObserver) {
+                           StreamObserver<AlterTableResponse> responseObserver) {
         SingleStoreConfiguration conf = new SingleStoreConfiguration(request.getConfigurationMap());
 
         try (Connection conn = JDBCUtil.createConnection(conf);
-                Statement stmt = conn.createStatement()) {
-            String query = JDBCUtil.generateAlterTableQuery(request);
+             Statement stmt = conn.createStatement()) {
+            String query = JDBCUtil.generateAlterTableQuery(request, new AlterTableWarningHandler(responseObserver));
             // query is null when table is not changed
             if (query != null) {
                 logger.info(String.format("Executing SQL:\n %s", query));
@@ -186,21 +234,26 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
             logger.warn(String.format("AlterTable failed for %s",
                     JDBCUtil.escapeTable(database, table)), e);
 
-            responseObserver.onNext(AlterTableResponse.newBuilder().setSuccess(false)
-                    .setFailure(e.getMessage()).build());
+            responseObserver.onNext(AlterTableResponse.newBuilder()
+                    .setTask(Task.newBuilder()
+                            .setMessage(e.getMessage()).build())
+                    .build());
+            responseObserver.onNext(AlterTableResponse.newBuilder()
+                    .setSuccess(false)
+                    .build());
             responseObserver.onCompleted();
         }
     }
 
     @Override
     public void truncate(TruncateRequest request,
-            StreamObserver<TruncateResponse> responseObserver) {
+                         StreamObserver<TruncateResponse> responseObserver) {
         SingleStoreConfiguration conf = new SingleStoreConfiguration(request.getConfigurationMap());
         String database = JDBCUtil.getDatabaseName(conf, request.getSchemaName());
         String table = JDBCUtil.getTableName(conf, request.getSchemaName(), request.getTableName());
 
         try (Connection conn = JDBCUtil.createConnection(conf);
-                Statement stmt = conn.createStatement()) {
+             Statement stmt = conn.createStatement()) {
             if (!JDBCUtil.checkTableExists(stmt, database, table)) {
                 logger.warn(String.format("Table %s doesn't exist",
                         JDBCUtil.escapeTable(database, table)));
@@ -219,15 +272,20 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
             logger.warn(String.format("TruncateTable failed for %s",
                     JDBCUtil.escapeTable(database, table)), e);
 
-            responseObserver.onNext(TruncateResponse.newBuilder().setSuccess(false)
-                    .setFailure(e.getMessage()).build());
+            responseObserver.onNext(TruncateResponse.newBuilder()
+                    .setTask(Task.newBuilder()
+                            .setMessage(e.getMessage()).build())
+                    .build());
+            responseObserver.onNext(TruncateResponse.newBuilder()
+                    .setSuccess(false)
+                    .build());
             responseObserver.onCompleted();
         }
     }
 
     @Override
     public void writeBatch(WriteBatchRequest request,
-            StreamObserver<WriteBatchResponse> responseObserver) {
+                           StreamObserver<WriteBatchResponse> responseObserver) {
         SingleStoreConfiguration conf = new SingleStoreConfiguration(request.getConfigurationMap());
         String database = JDBCUtil.getDatabaseName(conf, request.getSchemaName());
         String table =
@@ -241,14 +299,15 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
 
             LoadDataWriter w =
                     new LoadDataWriter(conn, database, table, request.getTable().getColumnsList(),
-                            request.getCsv(), request.getKeysMap(), conf.batchSize());
+                            request.getFileParams(), request.getKeysMap(), conf.batchSize(),
+                            new WriteBatchWarningHandler(responseObserver));
             for (String file : request.getReplaceFilesList()) {
                 w.write(file);
             }
 
             UpdateWriter u =
                     new UpdateWriter(conn, database, table, request.getTable().getColumnsList(),
-                            request.getCsv(), request.getKeysMap(), conf.batchSize());
+                            request.getFileParams(), request.getKeysMap(), conf.batchSize());
             for (String file : request.getUpdateFilesList()) {
                 u.write(file);
             }
@@ -256,7 +315,7 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
 
             DeleteWriter d =
                     new DeleteWriter(conn, database, table, request.getTable().getColumnsList(),
-                            request.getCsv(), request.getKeysMap(), conf.batchSize());
+                            request.getFileParams(), request.getKeysMap(), conf.batchSize());
             for (String file : request.getDeleteFilesList()) {
                 d.write(file);
             }
@@ -267,8 +326,13 @@ public class SingleStoreDestinationServiceImpl extends DestinationGrpc.Destinati
             logger.warn(String.format("WriteBatch failed for %s",
                     JDBCUtil.escapeTable(database, table)), e);
 
-            responseObserver.onNext(WriteBatchResponse.newBuilder().setSuccess(false)
-                    .setFailure(e.getMessage()).build());
+            responseObserver.onNext(WriteBatchResponse.newBuilder()
+                    .setTask(Task.newBuilder()
+                            .setMessage(e.getMessage()).build())
+                    .build());
+            responseObserver.onNext(WriteBatchResponse.newBuilder()
+                    .setSuccess(false)
+                    .build());
             responseObserver.onCompleted();
         }
     }

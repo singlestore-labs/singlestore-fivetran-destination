@@ -1,4 +1,4 @@
-package com.singlestore.fivetran.destination;
+package com.singlestore.fivetran.destination.connector;
 
 import io.grpc.*;
 import org.apache.commons.cli.*;
@@ -7,8 +7,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
-public class SingleStoreDestination {
-    private static final Logger logger = LoggerFactory.getLogger(SingleStoreDestination.class);
+public class SingleStoreDestinationConnector {
+    private static final Logger logger = LoggerFactory.getLogger(SingleStoreDestinationConnector.class);
 
     public static void main(String[] args)
             throws InterruptedException, IOException, ParseException {
@@ -44,7 +44,7 @@ public class SingleStoreDestination {
                 String.format("Starting Destination gRPC server (version %s) which listens port %d",
                         VersionProvider.getVersion(), port));
         Server server = ServerBuilder.forPort(port)
-                .addService(new SingleStoreDestinationServiceImpl()).build();
+                .addService(new SingleStoreDestinationConnectorServiceImpl()).build();
 
         server.start();
         logger.info(String.format("Destination gRPC server started"));

@@ -1,11 +1,12 @@
-package com.singlestore.fivetran.destination.writers;
+package com.singlestore.fivetran.destination.connector.writers;
 
 import com.google.protobuf.ByteString;
-import com.singlestore.fivetran.destination.JDBCUtil;
+import com.singlestore.fivetran.destination.connector.JDBCUtil;
 
-import fivetran_sdk.Column;
-import fivetran_sdk.CsvFileParams;
-import fivetran_sdk.DataType;
+import com.singlestore.fivetran.destination.connector.warning_util.WarningHandler;
+import fivetran_sdk.v2.Column;
+import fivetran_sdk.v2.FileParams;
+import fivetran_sdk.v2.DataType;
 
 import java.io.IOException;
 import java.io.PipedInputStream;
@@ -22,7 +23,7 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class LoadDataWriter extends Writer {
+public class LoadDataWriter<T> extends Writer {
     private static final Logger logger = LoggerFactory.getLogger(JDBCUtil.class);
 
     final int BUFFER_SIZE = 524288;
@@ -33,11 +34,14 @@ public class LoadDataWriter extends Writer {
     Thread t;
     final SQLException[] queryException = new SQLException[1];
     Statement stmt;
+    WarningHandler<T> warningHandler;
 
     public LoadDataWriter(Connection conn, String database, String table, List<Column> columns,
-            CsvFileParams params, Map<String, ByteString> secretKeys, Integer batchSize)
+                          FileParams params, Map<String, ByteString> secretKeys, Integer batchSize,
+                          WarningHandler<T> warningHandler)
             throws IOException {
         super(conn, database, table, columns, params, secretKeys, batchSize);
+        this.warningHandler = warningHandler;
     }
 
     private String tmpColumnName(String name) {
@@ -87,7 +91,8 @@ public class LoadDataWriter extends Writer {
                 stmt.executeUpdate(query);
                 stmt.close();
             } catch (SQLException e) {
-                logger.warn("Failed to execute LOAD DATA query", e);
+                warningHandler.handle("Failed to execute LOAD DATA query", e);
+
                 queryException[0] = e;
             }
         });
@@ -130,7 +135,8 @@ public class LoadDataWriter extends Writer {
                 }
             }
         } catch (Exception e) {
-            logger.warn("Failed to write TSV data to stream", e);
+            warningHandler.handle("Failed to write TSV data to stream", e);
+
             abort(e);
         }
     }
@@ -154,17 +160,17 @@ public class LoadDataWriter extends Writer {
         try {
             outputStream.close();
         } catch (Exception e) {
-            logger.warn("Failed to close the stream during the abort", e);
+            warningHandler.handle("Failed to close the stream during the abort", e);
         } finally {
             try {
                 stmt.cancel();
             } catch (Exception e) {
-                logger.warn("Failed to cancel the statement during the abort", e);
+                warningHandler.handle("Failed to cancel the statement during the abort", e);
             } finally {
                 try {
                     t.interrupt();
                 } catch (Exception e) {
-                    logger.warn("Failed to interrupt the thread during the abort", e);
+                    warningHandler.handle("Failed to interrupt the thread during the abort", e);
                 }
             }
         }

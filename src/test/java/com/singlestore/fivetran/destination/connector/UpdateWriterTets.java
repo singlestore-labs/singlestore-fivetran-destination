@@ -1,9 +1,10 @@
-package com.singlestore.fivetran.destination;
+package com.singlestore.fivetran.destination.connector;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
@@ -11,13 +12,12 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 
+import com.singlestore.fivetran.destination.connector.writers.UpdateWriter;
 import org.junit.jupiter.api.Test;
-import com.singlestore.fivetran.destination.writers.DeleteWriter;
-import com.singlestore.fivetran.destination.writers.LoadDataWriter;
-import com.singlestore.fivetran.destination.writers.UpdateWriter;
+import com.singlestore.fivetran.destination.connector.writers.LoadDataWriter;
 
-import fivetran_sdk.CsvFileParams;
-import fivetran_sdk.Table;
+import fivetran_sdk.v2.FileParams;
+import fivetran_sdk.v2.Table;
 
 public class UpdateWriterTets extends IntegrationTestBase {
     @Test
@@ -25,9 +25,9 @@ public class UpdateWriterTets extends IntegrationTestBase {
         createAllTypesTable();
 
         try (Connection conn = JDBCUtil.createConnection(conf)) {
-            Table allTypesTable = JDBCUtil.getTable(conf, database, "allTypesTable", "allTypesTable");
-            CsvFileParams params = CsvFileParams.newBuilder().setNullString("NULL").build();
-            LoadDataWriter w = new LoadDataWriter(conn, database, allTypesTable.getName(), allTypesTable.getColumnsList(), params, null, 123);
+            Table allTypesTable = JDBCUtil.getTable(conf, database, "allTypesTable", "allTypesTable", testWarningHandle);
+            FileParams params = FileParams.newBuilder().setNullString("NULL").build();
+            LoadDataWriter w = new LoadDataWriter(conn, database, allTypesTable.getName(), allTypesTable.getColumnsList(), params, null, 123, testWarningHandle);
             w.setHeader(allTypesColumns);
             w.writeRow(List.of("1", "FALSE", "false", "", "-128", "-32768", "-8388608",
                     "-2147483648", "-2147483648", "-9223372036854775808", "-100.1", "-1000.01",
@@ -69,7 +69,7 @@ public class UpdateWriterTets extends IntegrationTestBase {
     @Test
     public void partialUpdate() throws Exception {
         try (Connection conn = JDBCUtil.createConnection(conf);
-                Statement stmt = conn.createStatement()) {
+             Statement stmt = conn.createStatement()) {
             stmt.execute(String.format("USE %s", database));
             stmt.execute("CREATE TABLE partialUpdate(id INT PRIMARY KEY, a INT, b INT)");
             stmt.execute("INSERT INTO partialUpdate VALUES(1, 2, 3)");
@@ -77,8 +77,8 @@ public class UpdateWriterTets extends IntegrationTestBase {
             stmt.execute("INSERT INTO partialUpdate VALUES(7, 8, 9)");
             stmt.execute("INSERT INTO partialUpdate VALUES(10, 11, 12)");
 
-            Table t = JDBCUtil.getTable(conf, database, "partialUpdate", "partialUpdate");
-            CsvFileParams params = CsvFileParams.newBuilder().setNullString("NULL")
+            Table t = JDBCUtil.getTable(conf, database, "partialUpdate", "partialUpdate", testWarningHandle);
+            FileParams params = FileParams.newBuilder().setNullString("NULL")
                     .setUnmodifiedString("unm").build();
 
             UpdateWriter u = new UpdateWriter(conn, database, t.getName(), t.getColumnsList(), params, null, 123);
@@ -104,12 +104,12 @@ public class UpdateWriterTets extends IntegrationTestBase {
 
         String dataBase64 = Base64.getEncoder().encodeToString(data);
         try (Connection conn = JDBCUtil.createConnection(conf);
-                Statement stmt = conn.createStatement();) {
+             Statement stmt = conn.createStatement();) {
             stmt.execute(String.format("USE %s", database));
             stmt.executeQuery("CREATE TABLE allBytes(a BLOB PRIMARY KEY, b INT)");
-            Table allBytesTable = JDBCUtil.getTable(conf, database, "allBytes", "allBytes");
-            CsvFileParams params = CsvFileParams.newBuilder().setNullString("NULL").build();
-            LoadDataWriter w = new LoadDataWriter(conn, database, allBytesTable.getName(), allBytesTable.getColumnsList(), params, null, 123);
+            Table allBytesTable = JDBCUtil.getTable(conf, database, "allBytes", "allBytes", testWarningHandle);
+            FileParams params = FileParams.newBuilder().setNullString("NULL").build();
+            LoadDataWriter w = new LoadDataWriter(conn, database, allBytesTable.getName(), allBytesTable.getColumnsList(), params, null, 123, testWarningHandle);
             w.setHeader(List.of("a", "b"));
             w.writeRow(List.of(dataBase64, "1"));
             w.commit();

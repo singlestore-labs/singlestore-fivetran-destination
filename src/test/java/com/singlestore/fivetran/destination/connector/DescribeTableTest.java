@@ -1,4 +1,4 @@
-package com.singlestore.fivetran.destination;
+package com.singlestore.fivetran.destination.connector;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -8,9 +8,9 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
-import fivetran_sdk.Column;
-import fivetran_sdk.DataType;
-import fivetran_sdk.Table;
+import fivetran_sdk.v2.Column;
+import fivetran_sdk.v2.DataType;
+import fivetran_sdk.v2.Table;
 
 public class DescribeTableTest extends IntegrationTestBase {
     @Test
@@ -18,7 +18,7 @@ public class DescribeTableTest extends IntegrationTestBase {
         createAllTypesTable();
 
         try (Connection conn = JDBCUtil.createConnection(conf)) {
-            Table allTypesTable = JDBCUtil.getTable(conf, database, "allTypesTable", "allTypesTable");
+            Table allTypesTable = JDBCUtil.getTable(conf, database, "allTypesTable", "allTypesTable", testWarningHandle);
             assertEquals("allTypesTable", allTypesTable.getName());
             List<Column> columns = allTypesTable.getColumnsList();
 
@@ -187,25 +187,25 @@ public class DescribeTableTest extends IntegrationTestBase {
     @Test
     public void scaleAndPrecision() throws Exception {
         try (Connection conn = JDBCUtil.createConnection(conf);
-                Statement stmt = conn.createStatement();) {
+             Statement stmt = conn.createStatement();) {
             stmt.executeQuery(String.format("USE %s", database));
             stmt.executeQuery("CREATE TABLE scaleAndPrecision(" + "dec1 DECIMAL(38, 30), "
                     + "dec2 DECIMAL(10, 5)" + ")");
-            Table t = JDBCUtil.getTable(conf, database, "scaleAndPrecision", "scaleAndPrecision");
+            Table t = JDBCUtil.getTable(conf, database, "scaleAndPrecision", "scaleAndPrecision", testWarningHandle);
             assertEquals("scaleAndPrecision", t.getName());
             List<Column> columns = t.getColumnsList();
 
             assertEquals("dec1", columns.get(0).getName());
             assertEquals(DataType.DECIMAL, columns.get(0).getType());
             assertEquals(false, columns.get(0).getPrimaryKey());
-            assertEquals(38, columns.get(0).getDecimal().getPrecision());
-            assertEquals(30, columns.get(0).getDecimal().getScale());
+            assertEquals(38, columns.get(0).getParams().getDecimal().getPrecision());
+            assertEquals(30, columns.get(0).getParams().getDecimal().getScale());
 
             assertEquals("dec2", columns.get(1).getName());
             assertEquals(DataType.DECIMAL, columns.get(1).getType());
             assertEquals(false, columns.get(1).getPrimaryKey());
-            assertEquals(10, columns.get(1).getDecimal().getPrecision());
-            assertEquals(5, columns.get(1).getDecimal().getScale());
+            assertEquals(10, columns.get(1).getParams().getDecimal().getPrecision());
+            assertEquals(5, columns.get(1).getParams().getDecimal().getScale());
         }
     }
 }

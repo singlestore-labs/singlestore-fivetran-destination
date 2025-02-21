@@ -1,11 +1,11 @@
-package com.singlestore.fivetran.destination;
+package com.singlestore.fivetran.destination.connector;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.Timestamp;
-import com.singlestore.fivetran.destination.writers.DeleteWriter;
-import com.singlestore.fivetran.destination.writers.LoadDataWriter;
-import com.singlestore.fivetran.destination.writers.UpdateWriter;
-import fivetran_sdk.*;
+import com.singlestore.fivetran.destination.connector.writers.DeleteWriter;
+import com.singlestore.fivetran.destination.connector.writers.UpdateWriter;
+import com.singlestore.fivetran.destination.connector.writers.LoadDataWriter;
+import fivetran_sdk.v2.*;
 import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
@@ -19,6 +19,7 @@ public class SingleDatabaseTest extends IntegrationTestBase {
     static ImmutableMap<String, String> confMap =
             ImmutableMap.of("host", host, "port", port, "user", user, "password", password, "database", database);
     static SingleStoreConfiguration conf = new SingleStoreConfiguration(confMap);
+
     @Test
     public void checkSingleDatabase() throws Exception {
         try (Connection conn = JDBCUtil.createConnection(conf);
@@ -36,7 +37,7 @@ public class SingleDatabaseTest extends IntegrationTestBase {
             stmt.execute(query);
 
             // GET TABLE
-            Table result = JDBCUtil.getTable(conf, database, "schema__checkSingleDatabase", "checkSingleDatabase");
+            Table result = JDBCUtil.getTable(conf, database, "schema__checkSingleDatabase", "checkSingleDatabase", testWarningHandle);
             assertEquals("checkSingleDatabase", result.getName());
             List<Column> columns = result.getColumnsList();
 
@@ -52,13 +53,13 @@ public class SingleDatabaseTest extends IntegrationTestBase {
                             .build(),
                     Column.newBuilder().setName("c")
                             .setType(DataType.UTC_DATETIME).setPrimaryKey(false).build())
-                    ).build();
+            ).build();
             AlterTableRequest alterRequest = AlterTableRequest.newBuilder().putAllConfiguration(confMap)
                     .setSchemaName("schema").setTable(t).build();
-            query = JDBCUtil.generateAlterTableQuery(alterRequest);
+            query = JDBCUtil.generateAlterTableQuery(alterRequest, testWarningHandle);
             stmt.execute(query);
 
-            result = JDBCUtil.getTable(conf, database, "schema__checkSingleDatabase", "checkSingleDatabase");
+            result = JDBCUtil.getTable(conf, database, "schema__checkSingleDatabase", "checkSingleDatabase", testWarningHandle);
             assertEquals("checkSingleDatabase", result.getName());
             columns = result.getColumnsList();
 
@@ -73,8 +74,8 @@ public class SingleDatabaseTest extends IntegrationTestBase {
             assertEquals(false, columns.get(2).getPrimaryKey());
 
             // WRITE DATA
-            CsvFileParams params = CsvFileParams.newBuilder().setNullString("NULL").build();
-            LoadDataWriter w = new LoadDataWriter(conn, database, "schema__checkSingleDatabase", t.getColumnsList(), params, null, 123);
+            FileParams params = FileParams.newBuilder().setNullString("NULL").build();
+            LoadDataWriter w = new LoadDataWriter(conn, database, "schema__checkSingleDatabase", t.getColumnsList(), params, null, 123, testWarningHandle);
             w.setHeader(List.of("a", "b", "c"));
             w.writeRow(List.of("1", "2", "2038-01-19 03:14:07.123455"));
             w.writeRow(List.of("3", "4", "2038-01-19 03:14:07.123460"));
@@ -109,7 +110,7 @@ public class SingleDatabaseTest extends IntegrationTestBase {
                     .build();
 
             stmt.execute(JDBCUtil.generateTruncateTableQuery(conf, tr));
-            
+
             checkResult("SELECT * FROM `schema__checkSingleDatabase` ORDER BY a", Arrays.asList());
         }
     }

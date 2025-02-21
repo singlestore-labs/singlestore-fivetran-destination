@@ -1,14 +1,14 @@
-package com.singlestore.fivetran.destination.writers;
+package com.singlestore.fivetran.destination.connector.writers;
 
 import com.github.luben.zstd.ZstdInputStream;
 import com.google.protobuf.ByteString;
 import com.opencsv.CSVParserBuilder;
 import com.opencsv.CSVReader;
 import com.opencsv.CSVReaderBuilder;
-import fivetran_sdk.Column;
-import fivetran_sdk.Compression;
-import fivetran_sdk.CsvFileParams;
-import fivetran_sdk.Encryption;
+import fivetran_sdk.v2.Column;
+import fivetran_sdk.v2.Compression;
+import fivetran_sdk.v2.FileParams;
+import fivetran_sdk.v2.Encryption;
 
 import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
@@ -30,12 +30,12 @@ abstract public class Writer {
     String database;
     String table;
     List<Column> columns;
-    CsvFileParams params;
+    FileParams params;
     Map<String, ByteString> secretKeys;
     Integer batchSize;
 
     public Writer(Connection conn, String database, String table, List<Column> columns,
-            CsvFileParams params, Map<String, ByteString> secretKeys, Integer batchSize) {
+            FileParams params, Map<String, ByteString> secretKeys, Integer batchSize) {
         this.conn = conn;
         this.database = database;
         this.columns = columns;

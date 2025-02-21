@@ -1,6 +1,6 @@
 ---
-name: Setup Guide
-title: SingleStore Setup Guide
+name: SingleStore
+title: SingleStore Destination connector for Fivetran
 description: Follow this guide to set up SingleStore as a destination in Fivetran.
 ---
 
@@ -8,7 +8,7 @@ description: Follow this guide to set up SingleStore as a destination in Fivetra
 
 Follow the steps in this guide to connect SingleStore to Fivetran.
 
-> NOTE: This destination is [partner-built](/docs/partner-built-program). For any questions related to SingleStore destination and its documentation, contact SingleStore by raising an issue in the [SingleStore Fivetran Destination](https://github.com/singlestore-labs/singlestore-fivetran-destination) GitHub repository.
+> NOTE: This connector is [partner-built](/docs/partner-built-program). For any questions related to SingleStore Destination connector and its documentation, contact SingleStore by raising an issue in the [SingleStore Fivetran Destination Connector](https://github.com/singlestore-labs/singlestore-fivetran-destination) GitHub repository.
 
 ---
 

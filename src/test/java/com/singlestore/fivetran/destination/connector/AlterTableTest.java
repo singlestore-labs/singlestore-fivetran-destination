@@ -1,4 +1,4 @@
-package com.singlestore.fivetran.destination;
+package com.singlestore.fivetran.destination.connector;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -10,21 +10,15 @@ import java.sql.Statement;
 import java.util.Arrays;
 import java.util.List;
 
+import fivetran_sdk.v2.*;
 import org.junit.jupiter.api.Test;
-
-import fivetran_sdk.AlterTableRequest;
-import fivetran_sdk.Column;
-import fivetran_sdk.CreateTableRequest;
-import fivetran_sdk.DataType;
-import fivetran_sdk.DecimalParams;
-import fivetran_sdk.Table;
 
 public class AlterTableTest extends IntegrationTestBase {
 
     @Test
     public void addColumn() throws SQLException, Exception {
         try (Connection conn = JDBCUtil.createConnection(conf);
-                Statement stmt = conn.createStatement();) {
+             Statement stmt = conn.createStatement();) {
             stmt.execute(String.format("USE %s", database));
             stmt.execute("CREATE TABLE addColumn(a INT)");
             Table table = Table.newBuilder().setName("addColumn")
@@ -36,9 +30,9 @@ public class AlterTableTest extends IntegrationTestBase {
             AlterTableRequest request = AlterTableRequest.newBuilder().putAllConfiguration(confMap)
                     .setSchemaName(database).setTable(table).build();
 
-            String query = JDBCUtil.generateAlterTableQuery(request);
+            String query = JDBCUtil.generateAlterTableQuery(request, testWarningHandle);
             stmt.execute(query);
-            Table result = JDBCUtil.getTable(conf, database, "addColumn", "addColumn");
+            Table result = JDBCUtil.getTable(conf, database, "addColumn", "addColumn", testWarningHandle);
             List<Column> columns = result.getColumnsList();
 
             assertEquals("a", columns.get(0).getName());
@@ -54,7 +48,7 @@ public class AlterTableTest extends IntegrationTestBase {
     @Test
     public void changeDataType() throws SQLException, Exception {
         try (Connection conn = JDBCUtil.createConnection(conf);
-                Statement stmt = conn.createStatement();) {
+             Statement stmt = conn.createStatement();) {
             stmt.execute(String.format("USE %s", database));
             stmt.execute("CREATE TABLE changeDataType(a INT)");
             stmt.execute("INSERT INTO changeDataType VALUES (5)");
@@ -67,9 +61,9 @@ public class AlterTableTest extends IntegrationTestBase {
             AlterTableRequest request = AlterTableRequest.newBuilder().putAllConfiguration(confMap)
                     .setSchemaName(database).setTable(table).build();
 
-            String query = JDBCUtil.generateAlterTableQuery(request);
+            String query = JDBCUtil.generateAlterTableQuery(request, testWarningHandle);
             stmt.execute(query);
-            Table result = JDBCUtil.getTable(conf, database, "changeDataType", "changeDataType");
+            Table result = JDBCUtil.getTable(conf, database, "changeDataType", "changeDataType", testWarningHandle);
             List<Column> columns = result.getColumnsList();
 
             assertEquals("a", columns.get(0).getName());
@@ -83,19 +77,19 @@ public class AlterTableTest extends IntegrationTestBase {
     @Test
     public void changeKey() throws Exception {
         try (Connection conn = JDBCUtil.createConnection(conf);
-                Statement stmt = conn.createStatement();) {
+             Statement stmt = conn.createStatement();) {
             stmt.execute(String.format("USE %s", database));
             stmt.execute("CREATE TABLE changeKey(a INT)");
             Table table = Table.newBuilder().setName("changeKey").addAllColumns(Arrays.asList(Column
-                    .newBuilder().setName("a").setType(DataType.INT).setPrimaryKey(true).build()))
+                            .newBuilder().setName("a").setType(DataType.INT).setPrimaryKey(true).build()))
                     .build();
 
             AlterTableRequest request = AlterTableRequest.newBuilder().putAllConfiguration(confMap)
                     .setSchemaName(database).setTable(table).build();
 
-            String query = JDBCUtil.generateAlterTableQuery(request);
+            String query = JDBCUtil.generateAlterTableQuery(request, testWarningHandle);
             stmt.execute(query);
-            Table result = JDBCUtil.getTable(conf, database, "changeKey", "changeKey");
+            Table result = JDBCUtil.getTable(conf, database, "changeKey", "changeKey", testWarningHandle);
             List<Column> columns = result.getColumnsList();
 
             assertEquals("a", columns.get(0).getName());
@@ -108,7 +102,7 @@ public class AlterTableTest extends IntegrationTestBase {
     @Test
     public void severalOperations() throws SQLException, Exception {
         try (Connection conn = JDBCUtil.createConnection(conf);
-                Statement stmt = conn.createStatement();) {
+             Statement stmt = conn.createStatement();) {
             stmt.execute(String.format("USE %s", database));
             stmt.execute("CREATE TABLE severalOperations(a INT, b INT)");
             stmt.execute("INSERT INTO severalOperations VALUES (5, 6)");
@@ -123,10 +117,10 @@ public class AlterTableTest extends IntegrationTestBase {
             AlterTableRequest request = AlterTableRequest.newBuilder().putAllConfiguration(confMap)
                     .setSchemaName(database).setTable(table).build();
 
-            String query = JDBCUtil.generateAlterTableQuery(request);
+            String query = JDBCUtil.generateAlterTableQuery(request, testWarningHandle);
             stmt.execute(query);
             Table result =
-                    JDBCUtil.getTable(conf, database, "severalOperations", "severalOperations");
+                    JDBCUtil.getTable(conf, database, "severalOperations", "severalOperations", testWarningHandle);
             List<Column> columns = result.getColumnsList();
 
             assertEquals("a", columns.get(0).getName());
@@ -149,31 +143,35 @@ public class AlterTableTest extends IntegrationTestBase {
     @Test
     public void changeScaleAndPrecision() throws SQLException, Exception {
         try (Connection conn = JDBCUtil.createConnection(conf);
-                Statement stmt = conn.createStatement();) {
+             Statement stmt = conn.createStatement();) {
             stmt.execute(String.format("USE %s", database));
             stmt.execute("CREATE TABLE changeScaleAndPrecision(a DECIMAL(38, 30))");
             stmt.execute("INSERT INTO changeScaleAndPrecision VALUES ('5.123')");
 
             Table table = Table.newBuilder().setName("changeScaleAndPrecision").addAllColumns(
-                    Arrays.asList(Column.newBuilder().setName("a").setType(DataType.DECIMAL)
-                            .setDecimal(DecimalParams.newBuilder().setScale(5).setPrecision(10))
-                            .build()))
+                            Arrays.asList(Column.newBuilder().setName("a").setType(DataType.DECIMAL)
+                                    .setParams(DataTypeParams.newBuilder()
+                                            .setDecimal(DecimalParams.newBuilder()
+                                                    .setScale(5)
+                                                    .setPrecision(10))
+                                            .build())
+                                    .build()))
                     .build();
 
             AlterTableRequest request = AlterTableRequest.newBuilder().putAllConfiguration(confMap)
                     .setSchemaName(database).setTable(table).build();
 
-            String query = JDBCUtil.generateAlterTableQuery(request);
+            String query = JDBCUtil.generateAlterTableQuery(request, testWarningHandle);
             stmt.execute(query);
             Table result = JDBCUtil.getTable(conf, database, "changeScaleAndPrecision",
-                    "changeScaleAndPrecision");
+                    "changeScaleAndPrecision", testWarningHandle);
             List<Column> columns = result.getColumnsList();
 
             assertEquals("a", columns.get(0).getName());
             assertEquals(DataType.DECIMAL, columns.get(0).getType());
             assertEquals(false, columns.get(0).getPrimaryKey());
-            assertEquals(10, columns.get(0).getDecimal().getPrecision());
-            assertEquals(5, columns.get(0).getDecimal().getScale());
+            assertEquals(10, columns.get(0).getParams().getDecimal().getPrecision());
+            assertEquals(5, columns.get(0).getParams().getDecimal().getScale());
 
             checkResult("SELECT * FROM `changeScaleAndPrecision`",
                     Arrays.asList(Arrays.asList("5.12300")));
@@ -183,7 +181,7 @@ public class AlterTableTest extends IntegrationTestBase {
     @Test
     public void shouldIgnoreDifferentDatetimeColumns() throws Exception {
         try (Connection conn = JDBCUtil.createConnection(conf);
-                Statement stmt = conn.createStatement();) {
+             Statement stmt = conn.createStatement();) {
             Table naiveDatetimeTable =
                     Table.newBuilder().setName("shouldIgnoreDifferentDatetimeColumns")
                             .addAllColumns(Arrays.asList(Column.newBuilder().setName("a")
@@ -206,7 +204,7 @@ public class AlterTableTest extends IntegrationTestBase {
                     AlterTableRequest.newBuilder().putAllConfiguration(confMap)
                             .setSchemaName(database).setTable(utcDatetimeTable).build();
 
-            query = JDBCUtil.generateAlterTableQuery(alterRequest);
+            query = JDBCUtil.generateAlterTableQuery(alterRequest, testWarningHandle);
             assertNull(query);
         }
     }
@@ -214,7 +212,7 @@ public class AlterTableTest extends IntegrationTestBase {
     @Test
     public void changeTypeOfKey() throws Exception {
         try (Connection conn = JDBCUtil.createConnection(conf);
-                Statement stmt = conn.createStatement();) {
+             Statement stmt = conn.createStatement();) {
             stmt.execute(
                     String.format("CREATE TABLE %s.changeTypeOfKey(a INT PRIMARY KEY)", database));
             stmt.execute(String.format("INSERT INTO %s.changeTypeOfKey VALUES (1), (2)", database));
@@ -228,10 +226,10 @@ public class AlterTableTest extends IntegrationTestBase {
             AlterTableRequest request = AlterTableRequest.newBuilder().putAllConfiguration(confMap)
                     .setSchemaName(database).setTable(table).build();
 
-            String query = JDBCUtil.generateAlterTableQuery(request);
+            String query = JDBCUtil.generateAlterTableQuery(request, testWarningHandle);
 
             stmt.execute(query);
-            Table result = JDBCUtil.getTable(conf, database, "changeTypeOfKey", "changeTypeOfKey");
+            Table result = JDBCUtil.getTable(conf, database, "changeTypeOfKey", "changeTypeOfKey", testWarningHandle);
             List<Column> columns = result.getColumnsList();
 
             assertEquals("a", columns.get(0).getName());
