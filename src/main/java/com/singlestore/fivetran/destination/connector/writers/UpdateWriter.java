@@ -13,7 +13,7 @@ import java.util.Map;
 
 public class UpdateWriter extends Writer {
     public UpdateWriter(Connection conn, String database, String table, List<Column> columns,
-            FileParams params, Map<String, ByteString> secretKeys, Integer batchSize) {
+                        FileParams params, Map<String, ByteString> secretKeys, Integer batchSize) {
         super(conn, database, table, columns, params, secretKeys, batchSize);
     }
 
@@ -45,22 +45,22 @@ public class UpdateWriter extends Writer {
             if (!row.get(i).equals(params.getUnmodifiedString())) {
                 if (firstUpdateColumn) {
                     updateClause.append(
-                            String.format("%s = ?", JDBCUtil.escapeIdentifier(c.getName())));
+                            String.format("%s = ? ", JDBCUtil.escapeIdentifier(c.getName())));
                     firstUpdateColumn = false;
                 } else {
                     updateClause.append(
-                            String.format(", %s = ?", JDBCUtil.escapeIdentifier(c.getName())));
+                            String.format(", %s = ? ", JDBCUtil.escapeIdentifier(c.getName())));
                 }
             }
 
             if (c.getPrimaryKey()) {
                 if (firstPKColumn) {
                     whereClause.append(
-                            String.format("%s = ?", JDBCUtil.escapeIdentifier(c.getName())));
+                            String.format("%s = ? ", JDBCUtil.escapeIdentifier(c.getName())));
                     firstPKColumn = false;
                 } else {
                     whereClause.append(
-                            String.format(", %s = ?", JDBCUtil.escapeIdentifier(c.getName())));
+                            String.format("AND %s = ? ", JDBCUtil.escapeIdentifier(c.getName())));
                 }
             }
         }
@@ -101,5 +101,6 @@ public class UpdateWriter extends Writer {
     }
 
     @Override
-    public void commit() {}
+    public void commit() {
+    }
 }
