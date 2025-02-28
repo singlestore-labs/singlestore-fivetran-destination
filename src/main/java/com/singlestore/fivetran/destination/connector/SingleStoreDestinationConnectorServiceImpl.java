@@ -122,6 +122,16 @@ public class SingleStoreDestinationConnectorServiceImpl extends DestinationConne
     }
 
     @Override
+    public void capabilities(CapabilitiesRequest request,
+                             StreamObserver<CapabilitiesResponse> responseObserver) {
+        responseObserver.onNext(CapabilitiesResponse
+                .newBuilder()
+                .setBatchFileFormat(BatchFileFormat.CSV)
+                .build());
+        responseObserver.onCompleted();
+    }
+
+    @Override
     public void test(TestRequest request, StreamObserver<TestResponse> responseObserver) {
         String testName = request.getName();
 
