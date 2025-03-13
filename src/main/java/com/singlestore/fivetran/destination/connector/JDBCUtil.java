@@ -4,6 +4,8 @@ import com.singlestore.fivetran.destination.connector.warning_util.WarningHandle
 import fivetran_sdk.v2.*;
 
 import java.sql.*;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -413,14 +415,34 @@ public class JDBCUtil {
         }
     }
 
+    private static Timestamp toTimestamp(String dateTime) {
+        // Define the formatter for microsecond precision
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSS");
+
+        // Convert to LocalDateTime
+        LocalDateTime localDateTime = LocalDateTime.parse(dateTime, formatter);
+
+        // Convert LocalDateTime to Timestamp
+        return Timestamp.valueOf(localDateTime);
+    }
+
     public static String formatISODateTime(String dateTime) {
         dateTime = dateTime.replace("T", " ").replace("Z", "");
-        // SingleStore doesn't support more than 6 digits after a period
-        int dotPos = dateTime.indexOf(".", 0);
-        if (dotPos != -1 && dotPos + 6 < dateTime.length()) {
-            return dateTime.substring(0, dotPos + 6 + 1);
+
+        // We want all dates to have exactly 6 digits after the dot
+        int dotPos = dateTime.indexOf('.');
+        if (dotPos == -1) {
+            return dateTime + ".000000";
         }
-        return dateTime;
+
+        int digitsAfterDot = dateTime.length() - dotPos - 1;
+        if (digitsAfterDot >= 6) {
+            // Trim if more than 6 digits
+            return dateTime.substring(0, dotPos + 7);
+        }
+
+        // Append missing zeros to make it exactly 6 digits
+        return dateTime + "000000".substring(digitsAfterDot);
     }
 
     public static void setParameter(PreparedStatement stmt, Integer id, DataType type, String value,
