@@ -3,9 +3,7 @@ package com.singlestore.fivetran.destination.connector;
 import com.singlestore.fivetran.destination.connector.warning_util.AlterTableWarningHandler;
 import com.singlestore.fivetran.destination.connector.warning_util.DescribeTableWarningHandler;
 import com.singlestore.fivetran.destination.connector.warning_util.WriteBatchWarningHandler;
-import com.singlestore.fivetran.destination.connector.writers.DeleteWriter;
-import com.singlestore.fivetran.destination.connector.writers.LoadDataWriter;
-import com.singlestore.fivetran.destination.connector.writers.UpdateWriter;
+import com.singlestore.fivetran.destination.connector.writers.*;
 import fivetran_sdk.v2.*;
 import io.grpc.stub.StreamObserver;
 
@@ -303,12 +301,12 @@ public class SingleStoreDestinationConnectorServiceImpl extends DestinationConne
 
         try (Connection conn = JDBCUtil.createConnection(conf);) {
             if (request.getTable().getColumnsList().stream()
-                    .noneMatch(column -> column.getPrimaryKey())) {
+                    .noneMatch(Column::getPrimaryKey)) {
                 throw new Exception("No primary key found");
             }
 
-            LoadDataWriter w =
-                    new LoadDataWriter(conn, database, table, request.getTable().getColumnsList(),
+            LoadDataWriter<WriteBatchResponse> w =
+                    new LoadDataWriter<>(conn, database, table, request.getTable().getColumnsList(),
                             request.getFileParams(), request.getKeysMap(), conf.batchSize(),
                             new WriteBatchWarningHandler(responseObserver));
             for (String file : request.getReplaceFilesList()) {
@@ -334,6 +332,59 @@ public class SingleStoreDestinationConnectorServiceImpl extends DestinationConne
             responseObserver.onCompleted();
         } catch (Exception e) {
             logger.warn(String.format("WriteBatch failed for %s",
+                    JDBCUtil.escapeTable(database, table)), e);
+
+            responseObserver.onNext(WriteBatchResponse.newBuilder()
+                    .setTask(Task.newBuilder()
+                            .setMessage(e.getMessage()).build())
+                    .build());
+            responseObserver.onNext(WriteBatchResponse.newBuilder()
+                    .setSuccess(false)
+                    .build());
+            responseObserver.onCompleted();
+        }
+    }
+
+    @Override
+    public void writeHistoryBatch(WriteHistoryBatchRequest request,
+                                  StreamObserver<WriteBatchResponse> responseObserver) {
+        SingleStoreConfiguration conf = new SingleStoreConfiguration(request.getConfigurationMap());
+        String database = JDBCUtil.getDatabaseName(conf, request.getSchemaName());
+        String table =
+                JDBCUtil.getTableName(conf, request.getSchemaName(), request.getTable().getName());
+
+        try (Connection conn = JDBCUtil.createConnection(conf);) {
+            if (request.getTable().getColumnsList().stream()
+                    .noneMatch(Column::getPrimaryKey)) {
+                throw new Exception("No primary key found");
+            }
+
+            EarliestStartHistoryWriter e = new EarliestStartHistoryWriter(conn, database, table, request.getTable().getColumnsList(),
+                    request.getFileParams(), request.getKeysMap(), conf.batchSize());
+            for (String file : request.getEarliestStartFilesList()) {
+                e.write(file);
+            }
+
+            UpdateHistoryWriter u = new UpdateHistoryWriter(conn, database, table, request.getTable().getColumnsList(),
+                    request.getFileParams(), request.getKeysMap(), conf.batchSize());
+            for (String file : request.getUpdateFilesList()) {
+                u.write(file);
+            }
+
+            LoadDataWriter<WriteBatchResponse> w = new LoadDataWriter<>(conn, database, table, request.getTable().getColumnsList(),
+                    request.getFileParams(), request.getKeysMap(), conf.batchSize(),
+                    new WriteBatchWarningHandler(responseObserver));
+            for (String file : request.getReplaceFilesList()) {
+                w.write(file);
+            }
+
+            DeleteHistoryWriter d = new DeleteHistoryWriter(conn, database, table, request.getTable().getColumnsList(),
+                    request.getFileParams(), request.getKeysMap(), conf.batchSize());
+            for (String file : request.getDeleteFilesList()) {
+                d.write(file);
+            }
+        } catch (Exception e) {
+            logger.warn(String.format("WriteHistoryBatch failed for %s",
                     JDBCUtil.escapeTable(database, table)), e);
 
             responseObserver.onNext(WriteBatchResponse.newBuilder()

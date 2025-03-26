@@ -112,7 +112,8 @@ public class LoadDataWriter<T> extends Writer {
                     } else if (value.equalsIgnoreCase("false")) {
                         value = "0";
                     }
-                } else if (type == DataType.NAIVE_DATETIME || type == DataType.UTC_DATETIME) {
+                } else if ((type == DataType.NAIVE_DATETIME || type == DataType.UTC_DATETIME)
+                        && !value.equals(params.getNullString())) {
                     value = JDBCUtil.formatISODateTime(value);
                 }
 
