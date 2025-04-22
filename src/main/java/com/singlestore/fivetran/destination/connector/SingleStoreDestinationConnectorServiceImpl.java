@@ -383,6 +383,9 @@ public class SingleStoreDestinationConnectorServiceImpl extends DestinationConne
             for (String file : request.getDeleteFilesList()) {
                 d.write(file);
             }
+
+            responseObserver.onNext(WriteBatchResponse.newBuilder().setSuccess(true).build());
+            responseObserver.onCompleted();
         } catch (Exception e) {
             logger.warn(String.format("WriteHistoryBatch failed for %s",
                     JDBCUtil.escapeTable(database, table)), e);
