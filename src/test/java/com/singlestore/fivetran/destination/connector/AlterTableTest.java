@@ -30,8 +30,10 @@ public class AlterTableTest extends IntegrationTestBase {
             AlterTableRequest request = AlterTableRequest.newBuilder().putAllConfiguration(confMap)
                     .setSchemaName(database).setTable(table).build();
 
-            String query = JDBCUtil.generateAlterTableQuery(request, testWarningHandle);
-            stmt.execute(query);
+            List<JDBCUtil.QueryWithCleanup> queries = JDBCUtil.generateAlterTableQuery(request, testWarningHandle);
+            for (JDBCUtil.QueryWithCleanup q : queries) {
+                stmt.execute(q.getQuery());
+            }
             Table result = JDBCUtil.getTable(conf, database, "addColumn", "addColumn", testWarningHandle);
             List<Column> columns = result.getColumnsList();
 
@@ -61,8 +63,10 @@ public class AlterTableTest extends IntegrationTestBase {
             AlterTableRequest request = AlterTableRequest.newBuilder().putAllConfiguration(confMap)
                     .setSchemaName(database).setTable(table).build();
 
-            String query = JDBCUtil.generateAlterTableQuery(request, testWarningHandle);
-            stmt.execute(query);
+            List<JDBCUtil.QueryWithCleanup> queries = JDBCUtil.generateAlterTableQuery(request, testWarningHandle);
+            for (JDBCUtil.QueryWithCleanup q : queries) {
+                stmt.execute(q.getQuery());
+            }
             Table result = JDBCUtil.getTable(conf, database, "changeDataType", "changeDataType", testWarningHandle);
             List<Column> columns = result.getColumnsList();
 
@@ -87,8 +91,10 @@ public class AlterTableTest extends IntegrationTestBase {
             AlterTableRequest request = AlterTableRequest.newBuilder().putAllConfiguration(confMap)
                     .setSchemaName(database).setTable(table).build();
 
-            String query = JDBCUtil.generateAlterTableQuery(request, testWarningHandle);
-            stmt.execute(query);
+            List<JDBCUtil.QueryWithCleanup> queries = JDBCUtil.generateAlterTableQuery(request, testWarningHandle);
+            for (JDBCUtil.QueryWithCleanup q : queries) {
+                stmt.execute(q.getQuery());
+            }
             Table result = JDBCUtil.getTable(conf, database, "changeKey", "changeKey", testWarningHandle);
             List<Column> columns = result.getColumnsList();
 
@@ -117,8 +123,10 @@ public class AlterTableTest extends IntegrationTestBase {
             AlterTableRequest request = AlterTableRequest.newBuilder().putAllConfiguration(confMap)
                     .setSchemaName(database).setTable(table).build();
 
-            String query = JDBCUtil.generateAlterTableQuery(request, testWarningHandle);
-            stmt.execute(query);
+            List<JDBCUtil.QueryWithCleanup> queries = JDBCUtil.generateAlterTableQuery(request, testWarningHandle);
+            for (JDBCUtil.QueryWithCleanup q : queries) {
+                stmt.execute(q.getQuery());
+            }
             Table result =
                     JDBCUtil.getTable(conf, database, "severalOperations", "severalOperations", testWarningHandle);
             List<Column> columns = result.getColumnsList();
@@ -161,8 +169,10 @@ public class AlterTableTest extends IntegrationTestBase {
             AlterTableRequest request = AlterTableRequest.newBuilder().putAllConfiguration(confMap)
                     .setSchemaName(database).setTable(table).build();
 
-            String query = JDBCUtil.generateAlterTableQuery(request, testWarningHandle);
-            stmt.execute(query);
+            List<JDBCUtil.QueryWithCleanup> queries = JDBCUtil.generateAlterTableQuery(request, testWarningHandle);
+            for (JDBCUtil.QueryWithCleanup q : queries) {
+                stmt.execute(q.getQuery());
+            }
             Table result = JDBCUtil.getTable(conf, database, "changeScaleAndPrecision",
                     "changeScaleAndPrecision", testWarningHandle);
             List<Column> columns = result.getColumnsList();
@@ -204,8 +214,8 @@ public class AlterTableTest extends IntegrationTestBase {
                     AlterTableRequest.newBuilder().putAllConfiguration(confMap)
                             .setSchemaName(database).setTable(utcDatetimeTable).build();
 
-            query = JDBCUtil.generateAlterTableQuery(alterRequest, testWarningHandle);
-            assertNull(query);
+            List<JDBCUtil.QueryWithCleanup> alterQuery = JDBCUtil.generateAlterTableQuery(alterRequest, testWarningHandle);
+            assertNull(alterQuery);
         }
     }
 
@@ -226,9 +236,11 @@ public class AlterTableTest extends IntegrationTestBase {
             AlterTableRequest request = AlterTableRequest.newBuilder().putAllConfiguration(confMap)
                     .setSchemaName(database).setTable(table).build();
 
-            String query = JDBCUtil.generateAlterTableQuery(request, testWarningHandle);
+            List<JDBCUtil.QueryWithCleanup> queries = JDBCUtil.generateAlterTableQuery(request, testWarningHandle);
+            for (JDBCUtil.QueryWithCleanup q : queries) {
+                stmt.execute(q.getQuery());
+            }
 
-            stmt.execute(query);
             Table result = JDBCUtil.getTable(conf, database, "changeTypeOfKey", "changeTypeOfKey", testWarningHandle);
             List<Column> columns = result.getColumnsList();
 
@@ -242,6 +254,106 @@ public class AlterTableTest extends IntegrationTestBase {
 
             checkResult(String.format("SELECT * FROM %s.`changeTypeOfKey` ORDER BY a", database),
                     Arrays.asList(Arrays.asList("1", null), Arrays.asList("2", null)));
+        }
+    }
+
+    @Test
+    public void changeTypeOfKeyCleanup() throws Exception {
+        try (Connection conn = JDBCUtil.createConnection(conf);
+             Statement stmt = conn.createStatement();) {
+            stmt.execute(
+                    String.format("CREATE TABLE %s.changeTypeOfKeyCleanup(a INT PRIMARY KEY)", database));
+            stmt.execute(String.format("INSERT INTO %s.changeTypeOfKeyCleanup VALUES (1), (2)", database));
+            Table table = Table.newBuilder().setName("changeTypeOfKeyCleanup")
+                    .addAllColumns(Arrays.asList(Column.newBuilder().setName("a")
+                            .setType(DataType.LONG).setPrimaryKey(true).build()))
+                    .addAllColumns(Arrays.asList(
+                            Column.newBuilder().setName("b").setType(DataType.LONG).build()))
+                    .build();
+
+            AlterTableRequest request = AlterTableRequest.newBuilder().putAllConfiguration(confMap)
+                    .setSchemaName(database).setTable(table).build();
+
+            List<JDBCUtil.QueryWithCleanup> queries = JDBCUtil.generateAlterTableQuery(request, testWarningHandle);
+            stmt.execute(queries.get(0).getQuery());
+            stmt.execute(queries.get(1).getCleanupQuery());
+
+            Table result = JDBCUtil.getTable(conf, database, "changeTypeOfKeyCleanup", "changeTypeOfKeyCleanup", testWarningHandle);
+            List<Column> columns = result.getColumnsList();
+            assertEquals(1, columns.size());
+
+            assertEquals("a", columns.get(0).getName());
+            assertEquals(DataType.INT, columns.get(0).getType());
+            assertEquals(true, columns.get(0).getPrimaryKey());
+
+            checkResult(String.format("SELECT * FROM %s.`changeTypeOfKeyCleanup` ORDER BY a", database),
+                    Arrays.asList(Arrays.asList("1"), Arrays.asList("2")));
+
+            queries = JDBCUtil.generateAlterTableQuery(request, testWarningHandle);
+            stmt.execute(queries.get(0).getQuery());
+            stmt.execute(queries.get(1).getQuery());
+            stmt.execute(queries.get(2).getCleanupQuery());
+
+            result = JDBCUtil.getTable(conf, database, "changeTypeOfKeyCleanup", "changeTypeOfKeyCleanup", testWarningHandle);
+            columns = result.getColumnsList();
+            assertEquals(1, columns.size());
+
+            assertEquals("a", columns.get(0).getName());
+            assertEquals(DataType.INT, columns.get(0).getType());
+            assertEquals(true, columns.get(0).getPrimaryKey());
+
+            checkResult(String.format("SELECT * FROM %s.`changeTypeOfKeyCleanup` ORDER BY a", database),
+                    Arrays.asList(Arrays.asList("1"), Arrays.asList("2")));
+
+        }
+    }
+
+    @Test
+    public void changeTypeCleanup() throws Exception {
+        try (Connection conn = JDBCUtil.createConnection(conf);
+             Statement stmt = conn.createStatement();) {
+            stmt.execute(
+                    String.format("CREATE TABLE %s.changeTypeCleanup(a INT)", database));
+            stmt.execute(String.format("INSERT INTO %s.changeTypeCleanup VALUES (1), (2)", database));
+            Table table = Table.newBuilder().setName("changeTypeCleanup")
+                    .addAllColumns(Arrays.asList(Column.newBuilder().setName("a")
+                            .setType(DataType.LONG).setPrimaryKey(true).build()))
+                    .build();
+
+            AlterTableRequest request = AlterTableRequest.newBuilder().putAllConfiguration(confMap)
+                    .setSchemaName(database).setTable(table).build();
+
+            List<JDBCUtil.QueryWithCleanup> queries = JDBCUtil.generateAlterTableQuery(request, testWarningHandle);
+            stmt.execute(queries.get(0).getQuery());
+            stmt.execute(queries.get(1).getCleanupQuery());
+
+            Table result = JDBCUtil.getTable(conf, database, "changeTypeCleanup", "changeTypeCleanup", testWarningHandle);
+            List<Column> columns = result.getColumnsList();
+            assertEquals(1, columns.size());
+
+            assertEquals("a", columns.get(0).getName());
+            assertEquals(DataType.INT, columns.get(0).getType());
+            assertEquals(false, columns.get(0).getPrimaryKey());
+
+            checkResult(String.format("SELECT * FROM %s.`changeTypeCleanup` ORDER BY a", database),
+                    Arrays.asList(Arrays.asList("1"), Arrays.asList("2")));
+
+            queries = JDBCUtil.generateAlterTableQuery(request, testWarningHandle);
+            stmt.execute(queries.get(0).getQuery());
+            stmt.execute(queries.get(1).getQuery());
+            stmt.execute(queries.get(2).getCleanupQuery());
+
+            result = JDBCUtil.getTable(conf, database, "changeTypeCleanup", "changeTypeCleanup", testWarningHandle);
+            columns = result.getColumnsList();
+            assertEquals(1, columns.size());
+
+            assertEquals("a", columns.get(0).getName());
+            assertEquals(DataType.INT, columns.get(0).getType());
+            assertEquals(false, columns.get(0).getPrimaryKey());
+
+            checkResult(String.format("SELECT * FROM %s.`changeTypeCleanup` ORDER BY a", database),
+                    Arrays.asList(Arrays.asList("1"), Arrays.asList("2")));
+
         }
     }
 }

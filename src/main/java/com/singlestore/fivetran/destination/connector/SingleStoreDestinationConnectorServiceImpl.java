@@ -226,11 +226,33 @@ public class SingleStoreDestinationConnectorServiceImpl extends DestinationConne
 
         try (Connection conn = JDBCUtil.createConnection(conf);
              Statement stmt = conn.createStatement()) {
-            String query = JDBCUtil.generateAlterTableQuery(request, new AlterTableWarningHandler(responseObserver));
-            // query is null when table is not changed
-            if (query != null) {
-                logger.info(String.format("Executing SQL:\n %s", query));
-                stmt.execute(query);
+            List<JDBCUtil.QueryWithCleanup> queries = JDBCUtil.generateAlterTableQuery(request, new AlterTableWarningHandler(responseObserver));
+            if (queries != null && !queries.isEmpty()) {
+                for (JDBCUtil.QueryWithCleanup queryWithCleanup : queries) {
+                    try {
+                        String query = queryWithCleanup.getQuery();
+                        logger.info(String.format("Executing SQL:\n %s", query));
+                        stmt.execute(query);
+                    } catch (SQLException e) {
+                        // Perform cleanup if query execution fails
+                        String cleanupQuery = queryWithCleanup.getCleanupQuery();
+                        if (cleanupQuery != null) {
+                            try (Statement cleanupStmt = conn.createStatement()) {
+                                logger.info(String.format("Executing cleanup SQL:\n %s", cleanupQuery));
+                                cleanupStmt.execute(cleanupQuery);
+                            }
+                        }
+
+                        String warning = queryWithCleanup.getWarningMessage();
+                        if (warning != null) {
+                            responseObserver.onNext(AlterTableResponse.newBuilder()
+                                    .setWarning(Warning.newBuilder().setMessage(warning).build())
+                                    .build());
+                        }
+
+                        throw e;
+                    }
+                }
             }
 
             responseObserver.onNext(AlterTableResponse.newBuilder().setSuccess(true).build());

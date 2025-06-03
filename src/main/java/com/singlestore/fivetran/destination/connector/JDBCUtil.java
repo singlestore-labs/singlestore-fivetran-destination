@@ -61,6 +61,30 @@ public class JDBCUtil {
         }
     }
 
+    public static class QueryWithCleanup {
+        private final String query;
+        private final String cleanupQuery; // nullable
+        private final String warningMessage;
+
+        public QueryWithCleanup(String query, String cleanupQuery, String warningMessage) {
+            this.query = query;
+            this.cleanupQuery = cleanupQuery;
+            this.warningMessage = warningMessage;
+        }
+
+        public String getQuery() {
+            return query;
+        }
+
+        public String getCleanupQuery() {
+            return cleanupQuery;
+        }
+
+        public String getWarningMessage() {
+            return warningMessage;
+        }
+    }
+
     private static void putIfNotEmpty(Properties props, String key, String value) {
         if (key != null && !key.trim().isEmpty() && value != null && !value.trim().isEmpty()) {
             props.put(key.trim(), value.trim());
@@ -201,7 +225,7 @@ public class JDBCUtil {
         return pkColumnNames(t1).equals(pkColumnNames(t2));
     }
 
-    static <T> String generateAlterTableQuery(AlterTableRequest request, WarningHandler<T> warningHandler) throws Exception {
+    static <T> List<QueryWithCleanup> generateAlterTableQuery(AlterTableRequest request, WarningHandler<T> warningHandler) throws Exception {
         SingleStoreConfiguration conf = new SingleStoreConfiguration(request.getConfigurationMap());
 
         String database = JDBCUtil.getDatabaseName(conf, request.getSchemaName());
@@ -250,13 +274,15 @@ public class JDBCUtil {
         }
     }
 
-    static String generateRecreateTableQuery(String database, String tableName, Table table,
-                                             List<Column> commonColumns) {
-        String tmpTableName = tableName + "_alter_tmp";
+    static List<QueryWithCleanup> generateRecreateTableQuery(String database, String tableName, Table table,
+                                                             List<Column> commonColumns) {
+        String tmpTableName = getTempName(tableName);
         String columns = commonColumns.stream().map(column -> escapeIdentifier(column.getName()))
                 .collect(Collectors.joining(", "));
 
         String createTable = generateCreateTableQuery(database, tmpTableName, table);
+        String cleanupTmpTable = String.format("DROP TABLE IF EXISTS %s",
+                escapeTable(database, tmpTableName));
         String insertData = String.format("INSERT INTO %s (%s) SELECT %s FROM %s",
                 escapeTable(database, tmpTableName), columns, columns,
                 escapeTable(database, tableName));
@@ -264,7 +290,18 @@ public class JDBCUtil {
         String renameTable = String.format("ALTER TABLE %s RENAME AS %s",
                 escapeTable(database, tmpTableName), escapeTable(database, tableName));
 
-        return String.join("; ", createTable, insertData, dropTable, renameTable);
+        return Arrays.asList(
+                new QueryWithCleanup(createTable, null, null),
+                new QueryWithCleanup(insertData, cleanupTmpTable, null),
+                new QueryWithCleanup(dropTable, cleanupTmpTable, null),
+                // The original table has been dropped; all data now resides in the temporary table.
+                new QueryWithCleanup(renameTable, null,
+                        String.format("Failed to recreate table %s with the new schema. All data has been preserved in the temporary table %s. To avoid data loss, please rename %s back to %s.",
+                                escapeTable(database, tableName),
+                                escapeTable(database, tmpTableName),
+                                escapeTable(database, tmpTableName),
+                                escapeTable(database, tableName)))
+        );
     }
 
     static String generateTruncateTableQuery(SingleStoreConfiguration conf,
@@ -287,27 +324,34 @@ public class JDBCUtil {
         return query;
     }
 
-    static String generateAlterTableQuery(String database, String table, List<Column> columnsToAdd,
-                                          List<Column> columnsToChange) {
+    static List<QueryWithCleanup> generateAlterTableQuery(String database, String table, List<Column> columnsToAdd,
+                                                          List<Column> columnsToChange) {
         if (columnsToAdd.isEmpty() && columnsToChange.isEmpty()) {
             return null;
         }
 
-        StringBuilder query = new StringBuilder();
+        List<QueryWithCleanup> queries = new ArrayList<>();
 
         for (Column column : columnsToChange) {
-            String tmpColName = column.getName() + "_alter_tmp";
-            query.append(String.format("ALTER TABLE %s ADD COLUMN %s %s; ",
+            String tmpColName = getTempName(column.getName());
+
+            String addColumnQuery = String.format("ALTER TABLE %s ADD COLUMN %s %s",
                     escapeTable(database, table), escapeIdentifier(tmpColName),
-                    mapDataTypes(column.getType(), column.getParams())));
-            query.append(
-                    String.format("UPDATE %s SET %s = %s :> %s; ", escapeTable(database, table),
-                            escapeIdentifier(tmpColName), escapeIdentifier(column.getName()),
-                            mapDataTypes(column.getType(), column.getParams())));
-            query.append(String.format("ALTER TABLE %s DROP %s; ", escapeTable(database, table),
-                    escapeIdentifier(column.getName())));
-            query.append(String.format("ALTER TABLE %s CHANGE %s %s; ",
-                    escapeTable(database, table), tmpColName, escapeIdentifier(column.getName())));
+                    mapDataTypes(column.getType(), column.getParams()));
+            String cleanupTmpColumnQuery = String.format("ALTER TABLE %s DROP %s",
+                    escapeTable(database, table), escapeIdentifier(tmpColName));
+            String copyDataQuery = String.format("UPDATE %s SET %s = %s :> %s",
+                    escapeTable(database, table), escapeIdentifier(tmpColName),
+                    escapeIdentifier(column.getName()), mapDataTypes(column.getType(), column.getParams()));
+            String dropColumnQuery = String.format("ALTER TABLE %s DROP %s",
+                    escapeTable(database, table), escapeIdentifier(column.getName()));
+            String renameColumnQuery = String.format("ALTER TABLE %s CHANGE %s %s; ",
+                    escapeTable(database, table), tmpColName, escapeIdentifier(column.getName()));
+
+            queries.add(new QueryWithCleanup(addColumnQuery, null, null));
+            queries.add(new QueryWithCleanup(copyDataQuery, cleanupTmpColumnQuery, null));
+            queries.add(new QueryWithCleanup(dropColumnQuery, cleanupTmpColumnQuery, null));
+            queries.add(new QueryWithCleanup(renameColumnQuery, null, null));
         }
 
         if (!columnsToAdd.isEmpty()) {
@@ -316,11 +360,12 @@ public class JDBCUtil {
             columnsToAdd.forEach(column -> addOperations
                     .add(String.format("ADD %s", getColumnDefinition(column))));
 
-            query.append(String.format("ALTER TABLE %s %s; ", escapeTable(database, table),
-                    String.join(", ", addOperations)));
+            String addColumnsQuery = String.format("ALTER TABLE %s %s; ",
+                    escapeTable(database, table), String.join(", ", addOperations));
+            queries.add(new QueryWithCleanup(addColumnsQuery, null, null));
         }
 
-        return query.toString();
+        return queries;
     }
 
     static String generateCreateTableQuery(String database, String tableName, Table table) {
@@ -529,5 +574,9 @@ public class JDBCUtil {
         } else {
             return table;
         }
+    }
+
+    private static String getTempName(String originalName) {
+        return originalName + "_tmp_" + Integer.toHexString(new Random().nextInt(0x1000000));
     }
 }
