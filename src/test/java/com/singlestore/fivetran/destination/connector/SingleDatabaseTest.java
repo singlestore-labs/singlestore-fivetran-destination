@@ -56,8 +56,10 @@ public class SingleDatabaseTest extends IntegrationTestBase {
             ).build();
             AlterTableRequest alterRequest = AlterTableRequest.newBuilder().putAllConfiguration(confMap)
                     .setSchemaName("schema").setTable(t).build();
-            query = JDBCUtil.generateAlterTableQuery(alterRequest, testWarningHandle);
-            stmt.execute(query);
+            List<JDBCUtil.QueryWithCleanup> queries = JDBCUtil.generateAlterTableQuery(alterRequest, testWarningHandle);
+            for (JDBCUtil.QueryWithCleanup q : queries) {
+                stmt.execute(q.getQuery());
+            }
 
             result = JDBCUtil.getTable(conf, database, "schema__checkSingleDatabase", "checkSingleDatabase", testWarningHandle);
             assertEquals("checkSingleDatabase", result.getName());
