@@ -161,7 +161,7 @@ public class SingleStoreDestinationConnectorServiceImpl extends DestinationConne
         String table = JDBCUtil.getTableName(conf, request.getSchemaName(), request.getTableName());
 
         try {
-            Table t = JDBCUtil.getTable(conf, database, table, table, new DescribeTableWarningHandler(responseObserver));
+            Table t = JDBCUtil.getTable(conf, database, table, request.getTableName(), new DescribeTableWarningHandler(responseObserver));
 
             DescribeTableResponse response = DescribeTableResponse.newBuilder().setTable(t).build();
 
@@ -223,7 +223,6 @@ public class SingleStoreDestinationConnectorServiceImpl extends DestinationConne
     public void alterTable(AlterTableRequest request,
                            StreamObserver<AlterTableResponse> responseObserver) {
         SingleStoreConfiguration conf = new SingleStoreConfiguration(request.getConfigurationMap());
-
         try (Connection conn = JDBCUtil.createConnection(conf);
              Statement stmt = conn.createStatement()) {
             List<JDBCUtil.QueryWithCleanup> queries = JDBCUtil.generateAlterTableQuery(request, new AlterTableWarningHandler(responseObserver));
