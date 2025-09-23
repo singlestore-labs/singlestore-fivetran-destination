@@ -61,7 +61,8 @@ public class JDBCUtil {
                 throw e;
             }
         } catch (SQLNonTransientConnectionException e) {
-            if (e.getMessage().contains("Socket fail to connect to host:address")) {
+            String message = e.getMessage();
+            if (message != null && message.contains("Socket fail to connect")) {
                 String host = conf.host();
                 Integer port = conf.port();
 
