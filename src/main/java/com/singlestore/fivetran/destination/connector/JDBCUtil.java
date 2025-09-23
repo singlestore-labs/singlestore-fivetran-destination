@@ -48,16 +48,46 @@ public class JDBCUtil {
         String url = String.format("jdbc:singlestore://%s:%d", conf.host(), conf.port());
 
         try {
-            return DriverManager.getConnection(url, connectionProps);
-        } catch (SQLException e) {
-            if (e.getErrorCode() == 1046 && e.getSQLState().equals("3D000")
-                    && conf.database() != null) {
-                url = String.format("jdbc:singlestore://%s:%d/%s", conf.host(), conf.port(),
-                        conf.database());
+            try {
                 return DriverManager.getConnection(url, connectionProps);
-            }
+            } catch (SQLException e) {
+                if (e.getErrorCode() == 1046 && e.getSQLState().equals("3D000")
+                        && conf.database() != null) {
+                    url = String.format("jdbc:singlestore://%s:%d/%s", conf.host(), conf.port(),
+                            conf.database());
+                    return DriverManager.getConnection(url, connectionProps);
+                }
 
-            throw e;
+                throw e;
+            }
+        } catch (SQLNonTransientConnectionException e) {
+            if (e.getMessage().contains("Socket fail to connect to host:address")) {
+                String host = conf.host();
+                Integer port = conf.port();
+
+                String friendly = String.format(
+                        "Failed to connect to SingleStore at %s:%d.\n\n" +
+                                "Try these steps to resolve it:\n" +
+                                "  1) Verify your SingleStore cluster is running and listening on port %d.\n" +
+                                "  2) Confirm Fivetran’s IPs for your region are allowlisted in your firewall: https://fivetran.com/docs/using-fivetran/ips\n" +
+                                "  3) Ensure the hostname and port in the destination configuration are correct (host=%s, port=%d).\n\n" +
+                                "Original error: %s",
+                        host, port,
+                        port,
+                        host, port,
+                        e.getMessage()
+                );
+
+                // Preserve SQLState & vendor error code, and keep the original cause/stack
+                throw new SQLNonTransientConnectionException(
+                        friendly,
+                        e.getSQLState(),
+                        e.getErrorCode(),
+                        e
+                );
+            } else {
+                throw e;
+            }
         }
     }
 
