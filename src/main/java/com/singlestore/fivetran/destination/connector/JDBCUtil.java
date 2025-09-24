@@ -51,6 +51,11 @@ public class JDBCUtil {
             try {
                 return DriverManager.getConnection(url, connectionProps);
             } catch (SQLException e) {
+                // Error 1046 (SQLSTATE 3D000) = "No database selected".
+                // This typically means the user account does not have permission
+                // to connect without specifying a default database.
+                // If a database is provided in the configuration, retry the connection
+                // by explicitly including it in the JDBC URL.
                 if (e.getErrorCode() == 1046 && e.getSQLState().equals("3D000")
                         && conf.database() != null) {
                     url = String.format("jdbc:singlestore://%s:%d/%s", conf.host(), conf.port(),
@@ -61,6 +66,10 @@ public class JDBCUtil {
                 throw e;
             }
         } catch (SQLNonTransientConnectionException e) {
+            // Catch block to provide a clearer error message.
+            // A "Socket fail to connect" error indicates that the connector could not
+            // establish a connection to the database.
+            // Common causes include invalid credentials or firewall/network restrictions.
             String message = e.getMessage();
             if (message != null && message.contains("Socket fail to connect")) {
                 String host = conf.host();
