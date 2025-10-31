@@ -496,7 +496,7 @@ public class JDBCUtil {
                     }
                 }
 
-                return "TEXT CHARACTER SET utf8mb4";
+                return "LONGTEXT CHARACTER SET utf8mb4";
         }
     }
 
