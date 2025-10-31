@@ -226,7 +226,7 @@ public class CreateTableTest extends IntegrationTestBase {
             assertEquals("str5", columns.get(4).getName());
             assertEquals(DataType.STRING, columns.get(4).getType());
             assertFalse(columns.get(4).getPrimaryKey());
-            assertEquals(65535, columns.get(4).getParams().getStringByteLength());
+            assertEquals(2147483647, columns.get(4).getParams().getStringByteLength());
         }
     }
 
