@@ -91,19 +91,5 @@ public class IntegrationTestBase {
     }
 
 
-    WarningHandler<AlterTableResponse> testWarningHandle = new WarningHandler<AlterTableResponse>(null) {
-        @Override
-        public void handle(String message) {
-        }
-
-        @Override
-        public void handle(String message, Throwable t) {
-
-        }
-
-        @Override
-        public AlterTableResponse createWarning(String message) {
-            return null;
-        }
-    };
+    WarningHandler testWarningHandle = new WarningHandler();
 }
