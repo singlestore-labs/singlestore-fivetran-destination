@@ -1,7 +1,6 @@
 package com.singlestore.fivetran.destination.connector;
 
-import com.singlestore.fivetran.destination.connector.warning_util.AlterTableWarningHandler;
-import com.singlestore.fivetran.destination.connector.warning_util.DescribeTableWarningHandler;
+import com.singlestore.fivetran.destination.connector.warning_util.WarningHandler;
 import com.singlestore.fivetran.destination.connector.warning_util.WriteBatchWarningHandler;
 import com.singlestore.fivetran.destination.connector.writers.*;
 import fivetran_sdk.v2.*;
@@ -161,7 +160,7 @@ public class SingleStoreDestinationConnectorServiceImpl extends DestinationConne
         String table = JDBCUtil.getTableName(conf, request.getSchemaName(), request.getTableName());
 
         try {
-            Table t = JDBCUtil.getTable(conf, database, table, request.getTableName(), new DescribeTableWarningHandler(responseObserver));
+            Table t = JDBCUtil.getTable(conf, database, table, request.getTableName(), new WarningHandler());
 
             DescribeTableResponse response = DescribeTableResponse.newBuilder().setTable(t).build();
 
@@ -225,7 +224,8 @@ public class SingleStoreDestinationConnectorServiceImpl extends DestinationConne
         SingleStoreConfiguration conf = new SingleStoreConfiguration(request.getConfigurationMap());
         try (Connection conn = JDBCUtil.createConnection(conf);
              Statement stmt = conn.createStatement()) {
-            List<JDBCUtil.QueryWithCleanup> queries = JDBCUtil.generateAlterTableQuery(request, new AlterTableWarningHandler(responseObserver));
+            WarningHandler wh = new WarningHandler();
+            List<JDBCUtil.QueryWithCleanup> queries = JDBCUtil.generateAlterTableQuery(request, wh);
             if (queries != null && !queries.isEmpty()) {
                 for (JDBCUtil.QueryWithCleanup queryWithCleanup : queries) {
                     try {
@@ -243,10 +243,9 @@ public class SingleStoreDestinationConnectorServiceImpl extends DestinationConne
                         }
 
                         String warning = queryWithCleanup.getWarningMessage();
+
                         if (warning != null) {
-                            responseObserver.onNext(AlterTableResponse.newBuilder()
-                                    .setWarning(Warning.newBuilder().setMessage(warning).build())
-                                    .build());
+                            wh.handle(warning);
                         }
 
                         throw e;

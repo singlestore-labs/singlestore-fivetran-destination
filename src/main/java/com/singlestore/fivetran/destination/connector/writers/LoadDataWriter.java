@@ -34,11 +34,11 @@ public class LoadDataWriter<T> extends Writer {
     Thread t;
     final SQLException[] queryException = new SQLException[1];
     Statement stmt;
-    WarningHandler<T> warningHandler;
+    WarningHandler warningHandler;
 
     public LoadDataWriter(Connection conn, String database, String table, List<Column> columns,
                           FileParams params, Map<String, ByteString> secretKeys, Integer batchSize,
-                          WarningHandler<T> warningHandler)
+                          WarningHandler warningHandler)
             throws IOException {
         super(conn, database, table, columns, params, secretKeys, batchSize);
         this.warningHandler = warningHandler;

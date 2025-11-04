@@ -150,7 +150,7 @@ public class JDBCUtil {
 
 
     static <T> Table getTable(SingleStoreConfiguration conf, String database, String table,
-                              String originalTableName, WarningHandler<T> warningHandler) throws Exception {
+                              String originalTableName, WarningHandler warningHandler) throws Exception {
         try (Connection conn = JDBCUtil.createConnection(conf)) {
             DatabaseMetaData metadata = conn.getMetaData();
 
@@ -265,7 +265,7 @@ public class JDBCUtil {
         return pkColumnNames(t1).equals(pkColumnNames(t2));
     }
 
-    static <T> List<QueryWithCleanup> generateAlterTableQuery(AlterTableRequest request, WarningHandler<T> warningHandler) throws Exception {
+    static <T> List<QueryWithCleanup> generateAlterTableQuery(AlterTableRequest request, WarningHandler warningHandler) throws Exception {
         SingleStoreConfiguration conf = new SingleStoreConfiguration(request.getConfigurationMap());
 
         String database = JDBCUtil.getDatabaseName(conf, request.getSchemaName());
