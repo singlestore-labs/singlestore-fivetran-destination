@@ -619,4 +619,102 @@ public class JDBCUtil {
     private static String getTempName(String originalName) {
         return originalName + "_tmp_" + Integer.toHexString(new Random().nextInt(0x1000000));
     }
+
+    static List<QueryWithCleanup> generateMigrateQueries(MigrateRequest request, WarningHandler warningHandler) throws Exception {
+        SingleStoreConfiguration conf = new SingleStoreConfiguration(request.getConfigurationMap());
+
+        MigrationDetails details = request.getDetails();
+        String database = JDBCUtil.getDatabaseName(conf, details.getSchema());
+        String table =
+            JDBCUtil.getTableName(conf, details.getSchema(), details.getTable());
+
+        switch (details.getOperationCase()) {
+            case DROP:
+                DropOperation drop = details.getDrop();
+                switch (drop.getEntityCase()) {
+                    case DROP_TABLE:
+                        return generateMigrateDropQueries(table, database);
+                    case DROP_COLUMN_IN_HISTORY_MODE:
+                        // TODO: PLAT-7714
+                        return new ArrayList<>();
+                    default:
+                        throw new IllegalArgumentException("Unsupported drop operation");
+                }
+            case COPY:
+                CopyOperation copy = details.getCopy();
+                switch (copy.getEntityCase()) {
+                    case COPY_TABLE:
+                        // TODO: PLAT-7715
+                        return new ArrayList<>();
+                    case COPY_COLUMN:
+                        // TODO: PLAT-7716
+                        return new ArrayList<>();
+                    case COPY_TABLE_TO_HISTORY_MODE:
+                        // TODO: PLAT-7717
+                        return new ArrayList<>();
+                    default:
+                        throw new IllegalArgumentException("Unsupported copy operation");
+                }
+            case RENAME:
+                RenameOperation rename = details.getRename();
+                switch (rename.getEntityCase()) {
+                    case RENAME_TABLE:
+                        // TODO: PLAT-7718
+                        return new ArrayList<>();
+                    case RENAME_COLUMN:
+                        // TODO: PLAT-7719
+                        return new ArrayList<>();
+                    default:
+                        throw new IllegalArgumentException("Unsupported rename operation");
+                }
+            case ADD:
+                AddOperation add = details.getAdd();
+                switch (add.getEntityCase()) {
+                    case ADD_COLUMN_IN_HISTORY_MODE:
+                        // TODO: PLAT-7722
+                        return new ArrayList<>();
+                    case ADD_COLUMN_WITH_DEFAULT_VALUE:
+                        // TODO: PLAT-7720
+                        return new ArrayList<>();
+                    default:
+                        throw new IllegalArgumentException("Unsupported add operation");
+                }
+            case UPDATE_COLUMN_VALUE:
+                UpdateColumnValueOperation updateColumnValue = details.getUpdateColumnValue();
+                // TODO: PLAT-7721
+                return new ArrayList<>();
+            case TABLE_SYNC_MODE_MIGRATION:
+                TableSyncModeMigrationOperation tableSyncModeMigration = details.getTableSyncModeMigration();
+                TableSyncModeMigrationType type = tableSyncModeMigration.getType();
+                switch (type) {
+                    case SOFT_DELETE_TO_LIVE:
+                        // TODO: PLAT-7727
+                        return new ArrayList<>();
+                    case SOFT_DELETE_TO_HISTORY:
+                        // TODO: PLAT-7724
+                        return new ArrayList<>();
+                    case HISTORY_TO_SOFT_DELETE:
+                        // TODO: PLAT-7726
+                        return new ArrayList<>();
+                    case HISTORY_TO_LIVE:
+                        // TODO: PLAT-7725
+                        return new ArrayList<>();
+                    case LIVE_TO_HISTORY:
+                        // TODO: PLAT-7723
+                        return new ArrayList<>();
+                    case LIVE_TO_SOFT_DELETE:
+                        // TODO: PLAT-7728
+                        return new ArrayList<>();
+                    default:
+                        throw new IllegalArgumentException("Unsupported table sync mode migration operation");
+                }
+            default:
+                throw new IllegalArgumentException("Unsupported migration operation");
+        }
+    }
+
+    static List<QueryWithCleanup> generateMigrateDropQueries(String table, String database) {
+        String query = String.format("DROP TABLE IF EXISTS %s", escapeTable(database, table));
+        return Collections.singletonList(new QueryWithCleanup(query, null, null));
+    }
 }
