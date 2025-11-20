@@ -49,9 +49,9 @@ jobs:
           java-version: '11'
           distribution: 'temurin'
       - name: Copy common.proto file
-        run: wget -O src/main/proto/common.proto https://raw.githubusercontent.com/fivetran/fivetran_sdk/v2/common.proto
+        run: wget -O src/main/proto/common.proto https://raw.githubusercontent.com/fivetran/fivetran_sdk/main/common.proto
       - name: Copy destination_sdk.proto file
-        run: wget -O src/main/proto/destination_sdk.proto https://raw.githubusercontent.com/fivetran/fivetran_sdk/v2/destination_sdk.proto
+        run: wget -O src/main/proto/destination_sdk.proto https://raw.githubusercontent.com/fivetran/fivetran_sdk/main/destination_sdk.proto
       - name: Build with Gradle
         uses: gradle/gradle-build-action@bd5760595778326ba7f1441bcf7e88b49de61a25 # v2.6.0
         with:
