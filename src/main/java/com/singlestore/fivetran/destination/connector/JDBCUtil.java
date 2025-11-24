@@ -659,8 +659,13 @@ public class JDBCUtil {
                 RenameOperation rename = details.getRename();
                 switch (rename.getEntityCase()) {
                     case RENAME_TABLE:
-                        // TODO: PLAT-7718
-                        return new ArrayList<>();
+                        RenameTable renameTableMigration = rename.getRenameTable();
+                        String tableFrom =
+                            JDBCUtil.getTableName(conf, details.getSchema(), renameTableMigration.getFromTable());
+                        String tableTo =
+                            JDBCUtil.getTableName(conf, details.getSchema(), renameTableMigration.getToTable());
+
+                        return generateMigrateRenameTable(tableFrom, tableTo, database);
                     case RENAME_COLUMN:
                         // TODO: PLAT-7719
                         return new ArrayList<>();
@@ -715,6 +720,11 @@ public class JDBCUtil {
 
     static List<QueryWithCleanup> generateMigrateDropQueries(String table, String database) {
         String query = String.format("DROP TABLE IF EXISTS %s", escapeTable(database, table));
+        return Collections.singletonList(new QueryWithCleanup(query, null, null));
+    }
+
+    static List<QueryWithCleanup> generateMigrateRenameTable(String tableFrom, String tableTo, String database) {
+        String query = String.format("ALTER TABLE %s RENAME %s", escapeTable(database, tableFrom), escapeIdentifier(tableTo));
         return Collections.singletonList(new QueryWithCleanup(query, null, null));
     }
 }
