@@ -37,4 +37,36 @@ public class MigrateTest extends IntegrationTestBase {
             });
         }
     }
+
+    @Test
+    public void renameTable() throws Exception {
+        try (Connection conn = JDBCUtil.createConnection(conf);
+             Statement stmt = conn.createStatement();) {
+            stmt.execute(String.format("USE %s", database));
+            stmt.execute("CREATE TABLE renameTable(a INT)");
+
+            MigrateRequest request = MigrateRequest.newBuilder()
+                .putAllConfiguration(confMap)
+                .setDetails(MigrationDetails.newBuilder()
+                    .setTable("renameTable")
+                    .setSchema(database)
+                    .setRename(
+                        RenameOperation.newBuilder()
+                                .setRenameTable(
+                                    RenameTable.newBuilder()
+                                        .setFromTable("renameTable")
+                                        .setToTable("renameTable1")
+                                )
+                    ))
+                .build();
+
+            List<JDBCUtil.QueryWithCleanup> queries = JDBCUtil.generateMigrateQueries(request, testWarningHandle);
+            for (JDBCUtil.QueryWithCleanup q : queries) {
+                stmt.execute(q.getQuery());
+            }
+
+            Table renamed = JDBCUtil.getTable(conf, database, "renameTable1", "renameTable1", testWarningHandle);
+            Assertions.assertEquals("renameTable1", renamed.getName());
+        }
+    }
 }
