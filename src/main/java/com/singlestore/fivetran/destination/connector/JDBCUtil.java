@@ -667,8 +667,7 @@ public class JDBCUtil {
 
                         return generateMigrateRenameTable(tableFrom, tableTo, database);
                     case RENAME_COLUMN:
-                        // TODO: PLAT-7719
-                        return new ArrayList<>();
+                        return generateMigrateRenameColumn(rename.getRenameColumn(), database, table);
                     default:
                         throw new IllegalArgumentException("Unsupported rename operation");
                 }
@@ -725,6 +724,15 @@ public class JDBCUtil {
 
     static List<QueryWithCleanup> generateMigrateRenameTable(String tableFrom, String tableTo, String database) {
         String query = String.format("ALTER TABLE %s RENAME %s", escapeTable(database, tableFrom), escapeIdentifier(tableTo));
+        return Collections.singletonList(new QueryWithCleanup(query, null, null));
+    }
+
+    static List<QueryWithCleanup> generateMigrateRenameColumn(RenameColumn migration, String database, String table) {
+        String query = String.format("ALTER TABLE %s CHANGE %s %s",
+            escapeTable(database, table),
+            escapeIdentifier(migration.getFromColumn()),
+            escapeIdentifier(migration.getToColumn())
+        );
         return Collections.singletonList(new QueryWithCleanup(query, null, null));
     }
 }
