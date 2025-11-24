@@ -3,10 +3,8 @@ package com.singlestore.fivetran.destination.connector;
 import fivetran_sdk.v2.*;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import sun.jvm.hotspot.utilities.Assert;
 
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.util.List;
 import java.util.Optional;
