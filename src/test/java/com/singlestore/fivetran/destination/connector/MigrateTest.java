@@ -8,6 +8,8 @@ import java.sql.Connection;
 import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 public class MigrateTest extends IntegrationTestBase {
@@ -101,6 +103,47 @@ public class MigrateTest extends IntegrationTestBase {
 
             Table renamed = JDBCUtil.getTable(conf, database, "renameColumn", "renameTable1", testWarningHandle);
             renamed.getColumnsList().forEach(c -> Assertions.assertEquals("b", c.getName()));
+        }
+    }
+
+    @Test
+    public void copyTable() throws Exception {
+        try (Connection conn = JDBCUtil.createConnection(conf);
+             Statement stmt = conn.createStatement();) {
+            stmt.execute(String.format("USE %s", database));
+            stmt.execute("CREATE TABLE copyTable(a INT)");
+            stmt.execute("INSERT INTO copyTable VALUES (1), (2), (3)");
+
+            MigrateRequest request = MigrateRequest.newBuilder()
+                .putAllConfiguration(confMap)
+                .setDetails(MigrationDetails.newBuilder()
+                    .setTable("copyTable")
+                    .setSchema(database)
+                    .setCopy(
+                        CopyOperation.newBuilder()
+                            .setCopyTable(
+                                CopyTable.newBuilder()
+                                    .setFromTable("copyTable")
+                                    .setToTable("copyTable1")
+                            )
+                    ))
+                .build();
+
+            List<JDBCUtil.QueryWithCleanup> queries = JDBCUtil.generateMigrateQueries(request, testWarningHandle);
+            for (JDBCUtil.QueryWithCleanup q : queries) {
+                stmt.execute(q.getQuery());
+            }
+
+            Table originalTable = JDBCUtil.getTable(conf, database, "copyTable", "copyTable", testWarningHandle);
+            Assertions.assertEquals("copyTable", originalTable.getName());
+
+            Table copy = JDBCUtil.getTable(conf, database, "copyTable1", "copyTable1", testWarningHandle);
+            Assertions.assertEquals("copyTable1", copy.getName());
+
+            checkResult("SELECT * FROM `copyTable1` ORDER BY a",
+                Arrays.asList(Collections.singletonList("1"),
+                    Collections.singletonList("2"),
+                    Collections.singletonList("3")));
         }
     }
 
