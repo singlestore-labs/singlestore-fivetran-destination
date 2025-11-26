@@ -647,8 +647,14 @@ public class JDBCUtil {
                         // TODO: PLAT-7715
                         return new ArrayList<>();
                     case COPY_COLUMN:
-                        // TODO: PLAT-7716
-                        return new ArrayList<>();
+                        CopyColumn migration = copy.getCopyColumn();
+                        Table t = getTable(conf, database, table, details.getTable(), warningHandler);
+                        Column c = t.getColumnsList().stream()
+                            .filter(column -> column.getName().equals(migration.getFromColumn()))
+                            .findFirst()
+                            .orElseThrow(() -> new IllegalArgumentException("Source column doesn't exist"));
+
+                        return generateMigrateCopyColumn(copy.getCopyColumn(), database, table, c);
                     case COPY_TABLE_TO_HISTORY_MODE:
                         // TODO: PLAT-7717
                         return new ArrayList<>();
@@ -735,4 +741,31 @@ public class JDBCUtil {
         );
         return Collections.singletonList(new QueryWithCleanup(query, null, null));
     }
+
+    static List<QueryWithCleanup> generateMigrateCopyColumn(CopyColumn migration,
+                                                            String database,
+                                                            String table,
+                                                            Column c) {
+        String fromColumn = migration.getFromColumn();
+        String toColumn = migration.getToColumn();
+
+        String addColumnQuery = String.format("ALTER TABLE %s ADD COLUMN %s %s",
+            escapeTable(database, table),
+            escapeIdentifier(toColumn),
+            mapDataTypes(c.getType(), c.getParams())
+        );
+        String copyDataQuery = String.format("UPDATE %s SET %s = %s",
+            escapeTable(database, table),
+            escapeIdentifier(toColumn),
+            escapeIdentifier(fromColumn)
+        );
+        String dropColumnQuery = String.format("ALTER TABLE %s DROP COLUMN %s",
+            escapeTable(database, table),
+            escapeIdentifier(toColumn)
+        );
+
+        return Arrays.asList(new QueryWithCleanup(addColumnQuery, null, null),
+            new QueryWithCleanup(copyDataQuery, dropColumnQuery, null));
+    }
+
 }
