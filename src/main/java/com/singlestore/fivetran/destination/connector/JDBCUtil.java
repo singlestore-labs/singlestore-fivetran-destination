@@ -664,11 +664,22 @@ public class JDBCUtil {
                 CopyOperation copy = details.getCopy();
                 switch (copy.getEntityCase()) {
                     case COPY_TABLE:
-                        // TODO: PLAT-7715
-                        return new ArrayList<>();
+                        CopyTable renameTableMigration = copy.getCopyTable();
+                        String tableFrom =
+                            JDBCUtil.getTableName(conf, details.getSchema(), renameTableMigration.getFromTable());
+                        String tableTo =
+                            JDBCUtil.getTableName(conf, details.getSchema(), renameTableMigration.getToTable());
+
+                        return generateMigrateCopyTable(tableFrom, tableTo, database);
                     case COPY_COLUMN:
-                        // TODO: PLAT-7716
-                        return new ArrayList<>();
+                        CopyColumn migration = copy.getCopyColumn();
+                        Table t = getTable(conf, database, table, details.getTable(), warningHandler);
+                        Column c = t.getColumnsList().stream()
+                            .filter(column -> column.getName().equals(migration.getFromColumn()))
+                            .findFirst()
+                            .orElseThrow(() -> new IllegalArgumentException("Source column doesn't exist"));
+
+                        return generateMigrateCopyColumn(copy.getCopyColumn(), database, table, c);
                     case COPY_TABLE_TO_HISTORY_MODE:
                         // TODO: PLAT-7717
                         return new ArrayList<>();
@@ -679,11 +690,15 @@ public class JDBCUtil {
                 RenameOperation rename = details.getRename();
                 switch (rename.getEntityCase()) {
                     case RENAME_TABLE:
-                        // TODO: PLAT-7718
-                        return new ArrayList<>();
+                        RenameTable renameTableMigration = rename.getRenameTable();
+                        String tableFrom =
+                            JDBCUtil.getTableName(conf, details.getSchema(), renameTableMigration.getFromTable());
+                        String tableTo =
+                            JDBCUtil.getTableName(conf, details.getSchema(), renameTableMigration.getToTable());
+
+                        return generateMigrateRenameTable(tableFrom, tableTo, database);
                     case RENAME_COLUMN:
-                        // TODO: PLAT-7719
-                        return new ArrayList<>();
+                        return generateMigrateRenameColumn(rename.getRenameColumn(), database, table);
                     default:
                         throw new IllegalArgumentException("Unsupported rename operation");
                 }
@@ -742,11 +757,56 @@ public class JDBCUtil {
         DataType type = migration.getColumnType();
         String defaultValue = migration.getDefaultValue();
         String query = String.format("ALTER TABLE %s ADD COLUMN %s %s DEFAULT ?",
-                escapeTable(database, table), escapeIdentifier(column),
-                mapDataTypes(type, null));
+            escapeTable(database, table), escapeIdentifier(column),
+            mapDataTypes(type, null));
 
         QueryWithCleanup alterQuery = new QueryWithCleanup(query, null, null);
         alterQuery.addParameter(defaultValue, type);
         return Collections.singletonList(alterQuery);
+    }
+
+    static List<QueryWithCleanup> generateMigrateRenameTable(String tableFrom, String tableTo, String database) {
+        String query = String.format("ALTER TABLE %s RENAME %s", escapeTable(database, tableFrom), escapeIdentifier(tableTo));
+        return Collections.singletonList(new QueryWithCleanup(query, null, null));
+    }
+
+    static List<QueryWithCleanup> generateMigrateRenameColumn(RenameColumn migration, String database, String table) {
+        String query = String.format("ALTER TABLE %s CHANGE %s %s",
+            escapeTable(database, table),
+            escapeIdentifier(migration.getFromColumn()),
+            escapeIdentifier(migration.getToColumn())
+        );
+        return Collections.singletonList(new QueryWithCleanup(query, null, null));
+    }
+
+    static List<QueryWithCleanup> generateMigrateCopyColumn(CopyColumn migration,
+                                                            String database,
+                                                            String table,
+                                                            Column c) {
+        String fromColumn = migration.getFromColumn();
+        String toColumn = migration.getToColumn();
+
+        String addColumnQuery = String.format("ALTER TABLE %s ADD COLUMN %s %s",
+            escapeTable(database, table),
+            escapeIdentifier(toColumn),
+            mapDataTypes(c.getType(), c.getParams())
+        );
+        String copyDataQuery = String.format("UPDATE %s SET %s = %s",
+            escapeTable(database, table),
+            escapeIdentifier(toColumn),
+            escapeIdentifier(fromColumn)
+        );
+        String dropColumnQuery = String.format("ALTER TABLE %s DROP COLUMN %s",
+            escapeTable(database, table),
+            escapeIdentifier(toColumn)
+        );
+
+        return Arrays.asList(new QueryWithCleanup(addColumnQuery, null, null),
+            new QueryWithCleanup(copyDataQuery, dropColumnQuery, null));
+    }
+
+    static List<QueryWithCleanup> generateMigrateCopyTable(String tableFrom, String tableTo, String database) {
+        String query = String.format("CREATE TABLE %s AS SELECT * FROM %s", escapeTable(database, tableTo), escapeTable(database, tableFrom));
+        return Collections.singletonList(new QueryWithCleanup(query, null, null));
     }
 }
