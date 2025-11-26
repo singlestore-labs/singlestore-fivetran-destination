@@ -644,8 +644,13 @@ public class JDBCUtil {
                 CopyOperation copy = details.getCopy();
                 switch (copy.getEntityCase()) {
                     case COPY_TABLE:
-                        // TODO: PLAT-7715
-                        return new ArrayList<>();
+                        CopyTable renameTableMigration = copy.getCopyTable();
+                        String tableFrom =
+                            JDBCUtil.getTableName(conf, details.getSchema(), renameTableMigration.getFromTable());
+                        String tableTo =
+                            JDBCUtil.getTableName(conf, details.getSchema(), renameTableMigration.getToTable());
+
+                        return generateMigrateCopyTable(tableFrom, tableTo, database);
                     case COPY_COLUMN:
                         CopyColumn migration = copy.getCopyColumn();
                         Table t = getTable(conf, database, table, details.getTable(), warningHandler);
@@ -768,4 +773,8 @@ public class JDBCUtil {
             new QueryWithCleanup(copyDataQuery, dropColumnQuery, null));
     }
 
+    static List<QueryWithCleanup> generateMigrateCopyTable(String tableFrom, String tableTo, String database) {
+        String query = String.format("CREATE TABLE %s AS SELECT * FROM %s", escapeTable(database, tableTo), escapeTable(database, tableFrom));
+        return Collections.singletonList(new QueryWithCleanup(query, null, null));
+    }
 }
