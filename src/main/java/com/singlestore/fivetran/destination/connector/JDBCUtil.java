@@ -646,7 +646,7 @@ public class JDBCUtil {
         MigrationDetails details = request.getDetails();
         String database = JDBCUtil.getDatabaseName(conf, details.getSchema());
         String table =
-            JDBCUtil.getTableName(conf, details.getSchema(), details.getTable());
+                JDBCUtil.getTableName(conf, details.getSchema(), details.getTable());
 
         Table t;
         switch (details.getOperationCase()) {
@@ -667,18 +667,18 @@ public class JDBCUtil {
                     case COPY_TABLE:
                         CopyTable renameTableMigration = copy.getCopyTable();
                         String tableFrom =
-                            JDBCUtil.getTableName(conf, details.getSchema(), renameTableMigration.getFromTable());
+                                JDBCUtil.getTableName(conf, details.getSchema(), renameTableMigration.getFromTable());
                         String tableTo =
-                            JDBCUtil.getTableName(conf, details.getSchema(), renameTableMigration.getToTable());
+                                JDBCUtil.getTableName(conf, details.getSchema(), renameTableMigration.getToTable());
 
                         return generateMigrateCopyTable(tableFrom, tableTo, database);
                     case COPY_COLUMN:
                         CopyColumn migration = copy.getCopyColumn();
                         t = getTable(conf, database, table, details.getTable(), warningHandler);
                         Column c = t.getColumnsList().stream()
-                            .filter(column -> column.getName().equals(migration.getFromColumn()))
-                            .findFirst()
-                            .orElseThrow(() -> new IllegalArgumentException("Source column doesn't exist"));
+                                .filter(column -> column.getName().equals(migration.getFromColumn()))
+                                .findFirst()
+                                .orElseThrow(() -> new IllegalArgumentException("Source column doesn't exist"));
 
                         return generateMigrateCopyColumn(copy.getCopyColumn(), database, table, c);
                     case COPY_TABLE_TO_HISTORY_MODE:
@@ -693,9 +693,9 @@ public class JDBCUtil {
                     case RENAME_TABLE:
                         RenameTable renameTableMigration = rename.getRenameTable();
                         String tableFrom =
-                            JDBCUtil.getTableName(conf, details.getSchema(), renameTableMigration.getFromTable());
+                                JDBCUtil.getTableName(conf, details.getSchema(), renameTableMigration.getFromTable());
                         String tableTo =
-                            JDBCUtil.getTableName(conf, details.getSchema(), renameTableMigration.getToTable());
+                                JDBCUtil.getTableName(conf, details.getSchema(), renameTableMigration.getToTable());
 
                         return generateMigrateRenameTable(tableFrom, tableTo, database);
                     case RENAME_COLUMN:
@@ -718,9 +718,9 @@ public class JDBCUtil {
                 UpdateColumnValueOperation updateColumnValue = details.getUpdateColumnValue();
                 t = getTable(conf, database, table, details.getTable(), warningHandler);
                 Column c = t.getColumnsList().stream()
-                    .filter(column -> column.getName().equals(updateColumnValue.getColumn()))
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalArgumentException("Source column doesn't exist"));
+                        .filter(column -> column.getName().equals(updateColumnValue.getColumn()))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException("Source column doesn't exist"));
 
                 return generateMigrateUpdateColumnValueOperation(updateColumnValue, database, table, c.getType());
             case TABLE_SYNC_MODE_MIGRATION:
@@ -732,8 +732,8 @@ public class JDBCUtil {
                         // TODO: PLAT-7727
                         return new ArrayList<>();
                     case SOFT_DELETE_TO_HISTORY:
-                        // TODO: PLAT-7724
-                        return new ArrayList<>();
+                        t = getTable(conf, database, table, details.getTable(), warningHandler);
+                        return generateMigrateSoftDeleteToHistory(t, database, table, softDeleteColumn);
                     case HISTORY_TO_SOFT_DELETE:
                         // TODO: PLAT-7726
                         return new ArrayList<>();
@@ -763,8 +763,8 @@ public class JDBCUtil {
         DataType type = migration.getColumnType();
         String defaultValue = migration.getDefaultValue();
         String query = String.format("ALTER TABLE %s ADD COLUMN %s %s DEFAULT ?",
-            escapeTable(database, table), escapeIdentifier(column),
-            mapDataTypes(type, null));
+                escapeTable(database, table), escapeIdentifier(column),
+                mapDataTypes(type, null));
 
         QueryWithCleanup alterQuery = new QueryWithCleanup(query, null, null);
         alterQuery.addParameter(defaultValue, type);
@@ -778,9 +778,9 @@ public class JDBCUtil {
 
     static List<QueryWithCleanup> generateMigrateRenameColumn(RenameColumn migration, String database, String table) {
         String query = String.format("ALTER TABLE %s CHANGE %s %s",
-            escapeTable(database, table),
-            escapeIdentifier(migration.getFromColumn()),
-            escapeIdentifier(migration.getToColumn())
+                escapeTable(database, table),
+                escapeIdentifier(migration.getFromColumn()),
+                escapeIdentifier(migration.getToColumn())
         );
         return Collections.singletonList(new QueryWithCleanup(query, null, null));
     }
@@ -793,22 +793,22 @@ public class JDBCUtil {
         String toColumn = migration.getToColumn();
 
         String addColumnQuery = String.format("ALTER TABLE %s ADD COLUMN %s %s",
-            escapeTable(database, table),
-            escapeIdentifier(toColumn),
-            mapDataTypes(c.getType(), c.getParams())
+                escapeTable(database, table),
+                escapeIdentifier(toColumn),
+                mapDataTypes(c.getType(), c.getParams())
         );
         String copyDataQuery = String.format("UPDATE %s SET %s = %s",
-            escapeTable(database, table),
-            escapeIdentifier(toColumn),
-            escapeIdentifier(fromColumn)
+                escapeTable(database, table),
+                escapeIdentifier(toColumn),
+                escapeIdentifier(fromColumn)
         );
         String dropColumnQuery = String.format("ALTER TABLE %s DROP COLUMN %s",
-            escapeTable(database, table),
-            escapeIdentifier(toColumn)
+                escapeTable(database, table),
+                escapeIdentifier(toColumn)
         );
 
         return Arrays.asList(new QueryWithCleanup(addColumnQuery, null, null),
-            new QueryWithCleanup(copyDataQuery, dropColumnQuery, null));
+                new QueryWithCleanup(copyDataQuery, dropColumnQuery, null));
     }
 
     static List<QueryWithCleanup> generateMigrateCopyTable(String tableFrom, String tableTo, String database) {
@@ -853,39 +853,94 @@ public class JDBCUtil {
         // SingleStore doesn't support adding PK columns, so the table needs to be recreated from scratch.
         String tempTableName = getTempName(table);
         Table tempTable = t.toBuilder()
-            .setName(tempTableName)
-            .addColumns(
-                Column.newBuilder()
-                .setName("_fivetran_start")
-                .setType(DataType.NAIVE_DATETIME)
-                .setPrimaryKey(true)
-            )
-            .addColumns(
-                Column.newBuilder()
-                    .setName("_fivetran_end")
-                    .setType(DataType.NAIVE_DATETIME)
-            )
-            .addColumns(
-                Column.newBuilder()
-                    .setName("_fivetran_active")
-                    .setType(DataType.BOOLEAN)
-            ).build();
+                .setName(tempTableName)
+                .addColumns(
+                        Column.newBuilder()
+                                .setName("_fivetran_start")
+                                .setType(DataType.NAIVE_DATETIME)
+                                .setPrimaryKey(true)
+                )
+                .addColumns(
+                        Column.newBuilder()
+                                .setName("_fivetran_end")
+                                .setType(DataType.NAIVE_DATETIME)
+                )
+                .addColumns(
+                        Column.newBuilder()
+                                .setName("_fivetran_active")
+                                .setType(DataType.BOOLEAN)
+                ).build();
         String createTableQuery = generateCreateTableQuery(database, tempTableName, tempTable);
         String populateDataQuery = String.format("INSERT INTO %s SELECT *, NOW() AS `_fivetran_start`, '9999-12-31 23:59:59.999999' AS `_fivetran_end`, TRUE AS `_fivetran_active` FROM %s",
-            escapeTable(database, tempTableName), escapeTable(database, table));
+                escapeTable(database, tempTableName), escapeTable(database, table));
         String dropTableQuery = String.format("DROP TABLE IF EXISTS %s", escapeTable(database, table));
         String renameTableQuery = String.format("ALTER TABLE %s RENAME %s", escapeTable(database, tempTableName), escapeIdentifier(table));
 
         return Arrays.asList(
-            new QueryWithCleanup(createTableQuery, null, null),
-            new QueryWithCleanup(populateDataQuery, String.format("DROP TABLE IF EXISTS %s", escapeTable(database, tempTableName)), null),
-            new QueryWithCleanup(dropTableQuery, String.format("DROP TABLE IF EXISTS %s", escapeTable(database, tempTableName)), null),
-            new QueryWithCleanup(renameTableQuery, null,
-                String.format("Failed to migrate table %s to history mode. All data has been preserved in the temporary table %s. To avoid data loss, please rename %s back to %s.",
-                    escapeTable(database, table),
-                    escapeTable(database, tempTableName),
-                    escapeTable(database, tempTableName),
-                    escapeTable(database, table)))
+                new QueryWithCleanup(createTableQuery, null, null),
+                new QueryWithCleanup(populateDataQuery, String.format("DROP TABLE IF EXISTS %s", escapeTable(database, tempTableName)), null),
+                new QueryWithCleanup(dropTableQuery, String.format("DROP TABLE IF EXISTS %s", escapeTable(database, tempTableName)), null),
+                new QueryWithCleanup(renameTableQuery, null,
+                        String.format("Failed to migrate table %s to history mode. All data has been preserved in the temporary table %s. To avoid data loss, please rename %s back to %s.",
+                                escapeTable(database, table),
+                                escapeTable(database, tempTableName),
+                                escapeTable(database, tempTableName),
+                                escapeTable(database, table)))
+        );
+    }
+
+    static List<QueryWithCleanup> generateMigrateSoftDeleteToHistory(Table t,
+                                                                     String database,
+                                                                     String table,
+                                                                     String softDeleteColumn) {
+        // SingleStore doesn't support adding PK columns, so the table needs to be recreated from scratch.
+        String tempTableName = getTempName(table);
+        Table tempTable = t.toBuilder()
+                .setName(tempTableName)
+                .addColumns(
+                        Column.newBuilder()
+                                .setName("_fivetran_start")
+                                .setType(DataType.NAIVE_DATETIME)
+                                .setPrimaryKey(true)
+                )
+                .addColumns(
+                        Column.newBuilder()
+                                .setName("_fivetran_end")
+                                .setType(DataType.NAIVE_DATETIME)
+                )
+                .addColumns(
+                        Column.newBuilder()
+                                .setName("_fivetran_active")
+                                .setType(DataType.BOOLEAN)
+                ).build();
+        String createTableQuery = generateCreateTableQuery(database, tempTableName, tempTable);
+        String populateDataQuery = String.format("INSERT INTO %s " +
+                        "WITH _last_sync AS (SELECT MAX(_fivetran_synced) AS _last_sync FROM %s)" +
+                        "SELECT *, " +
+                        "IF(%s, '1000-01-01 00:00:00.000000', (SELECT _last_sync FROM _last_sync)) AS `_fivetran_start`, " +
+                        "IF(%s, '1000-01-01 00:00:00.000000', '9999-12-31 23:59:59.999999') AS `_fivetran_end`, " +
+                        "IF(%s, FALSE, TRUE) AS `_fivetran_active` " +
+                        "FROM %s",
+                escapeTable(database, tempTableName),
+                escapeTable(database, table),
+                escapeIdentifier(softDeleteColumn),
+                escapeIdentifier(softDeleteColumn),
+                escapeIdentifier(softDeleteColumn),
+                escapeTable(database, table)
+        );
+        String dropTableQuery = String.format("DROP TABLE IF EXISTS %s", escapeTable(database, table));
+        String renameTableQuery = String.format("ALTER TABLE %s RENAME %s", escapeTable(database, tempTableName), escapeIdentifier(table));
+
+        return Arrays.asList(
+                new QueryWithCleanup(createTableQuery, null, null),
+                new QueryWithCleanup(populateDataQuery, String.format("DROP TABLE IF EXISTS %s", escapeTable(database, tempTableName)), null),
+                new QueryWithCleanup(dropTableQuery, String.format("DROP TABLE IF EXISTS %s", escapeTable(database, tempTableName)), null),
+                new QueryWithCleanup(renameTableQuery, null,
+                        String.format("Failed to migrate table %s to history mode. All data has been preserved in the temporary table %s. To avoid data loss, please rename %s back to %s.",
+                                escapeTable(database, table),
+                                escapeTable(database, tempTableName),
+                                escapeTable(database, tempTableName),
+                                escapeTable(database, table)))
         );
     }
 }
