@@ -701,13 +701,14 @@ public class JDBCUtil {
             case TABLE_SYNC_MODE_MIGRATION:
                 TableSyncModeMigrationOperation tableSyncModeMigration = details.getTableSyncModeMigration();
                 TableSyncModeMigrationType type = tableSyncModeMigration.getType();
+                String softDeleteColumn = tableSyncModeMigration.getSoftDeletedColumn();
                 switch (type) {
                     case SOFT_DELETE_TO_LIVE:
                         // TODO: PLAT-7727
                         return new ArrayList<>();
                     case SOFT_DELETE_TO_HISTORY:
-                        // TODO: PLAT-7724
-                        return new ArrayList<>();
+                        Table t = getTable(conf, database, table, details.getTable(), warningHandler);
+                        return generateMigrateSoftDeleteToHistory(t, database, table, softDeleteColumn);
                     case HISTORY_TO_SOFT_DELETE:
                         // TODO: PLAT-7726
                         return new ArrayList<>();
@@ -776,5 +777,60 @@ public class JDBCUtil {
     static List<QueryWithCleanup> generateMigrateCopyTable(String tableFrom, String tableTo, String database) {
         String query = String.format("CREATE TABLE %s AS SELECT * FROM %s", escapeTable(database, tableTo), escapeTable(database, tableFrom));
         return Collections.singletonList(new QueryWithCleanup(query, null, null));
+    }
+
+    static List<QueryWithCleanup> generateMigrateSoftDeleteToHistory(Table t,
+                                                                     String database,
+                                                                     String table,
+                                                                     String softDeleteColumn) {
+        // SingleStore doesn't support adding PK columns, so the table needs to be recreated from scratch.
+        String tempTableName = getTempName(table);
+        Table tempTable = t.toBuilder()
+            .setName(tempTableName)
+            .addColumns(
+                Column.newBuilder()
+                    .setName("_fivetran_start")
+                    .setType(DataType.NAIVE_DATETIME)
+                    .setPrimaryKey(true)
+            )
+            .addColumns(
+                Column.newBuilder()
+                    .setName("_fivetran_end")
+                    .setType(DataType.NAIVE_DATETIME)
+            )
+            .addColumns(
+                Column.newBuilder()
+                    .setName("_fivetran_active")
+                    .setType(DataType.BOOLEAN)
+            ).build();
+        String createTableQuery = generateCreateTableQuery(database, tempTableName, tempTable);
+        String populateDataQuery = String.format("INSERT INTO %s " +
+                "WITH _last_sync AS (SELECT MAX(_fivetran_synced) AS _last_sync FROM %s)" +
+                "SELECT *, " +
+                "IF(%s, '1000-01-01 00:00:00.000000', (SELECT _last_sync FROM _last_sync)) AS `_fivetran_start`, " +
+                "IF(%s, '1000-01-01 00:00:00.000000', '9999-12-31 23:59:59.999999') AS `_fivetran_end`, " +
+                "IF(%s, FALSE, TRUE) AS `_fivetran_active` " +
+                "FROM %s",
+            escapeTable(database, tempTableName),
+            escapeTable(database, table),
+            escapeIdentifier(softDeleteColumn),
+            escapeIdentifier(softDeleteColumn),
+            escapeIdentifier(softDeleteColumn),
+            escapeTable(database, table)
+            );
+        String dropTableQuery = String.format("DROP TABLE IF EXISTS %s", escapeTable(database, table));
+        String renameTableQuery = String.format("ALTER TABLE %s RENAME %s", escapeTable(database, tempTableName), escapeIdentifier(table));
+
+        return Arrays.asList(
+            new QueryWithCleanup(createTableQuery, null, null),
+            new QueryWithCleanup(populateDataQuery, String.format("DROP TABLE IF EXISTS %s", escapeTable(database, tempTableName)), null),
+            new QueryWithCleanup(dropTableQuery, String.format("DROP TABLE IF EXISTS %s", escapeTable(database, tempTableName)), null),
+            new QueryWithCleanup(renameTableQuery, null,
+                String.format("Failed to migrate table %s to history mode. All data has been preserved in the temporary table %s. To avoid data loss, please rename %s back to %s.",
+                    escapeTable(database, table),
+                    escapeTable(database, tempTableName),
+                    escapeTable(database, tempTableName),
+                    escapeTable(database, table)))
+        );
     }
 }
