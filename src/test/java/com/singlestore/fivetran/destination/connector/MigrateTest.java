@@ -325,4 +325,46 @@ public class MigrateTest extends IntegrationTestBase {
             ));
         }
     }
+
+    @Test
+    public void liveToHistory() throws Exception {
+        try (Connection conn = JDBCUtil.createConnection(conf);
+             Statement stmt = conn.createStatement();) {
+            stmt.execute(String.format("USE %s", database));
+            stmt.execute("CREATE TABLE liveToHistory(a INT PRIMARY KEY)");
+            stmt.execute("INSERT INTO liveToHistory VALUES (1), (2)");
+
+            MigrateRequest request = MigrateRequest.newBuilder()
+                    .putAllConfiguration(confMap)
+                    .setDetails(MigrationDetails.newBuilder()
+            .setTable("liveToHistory")
+                    .setSchema(database)
+                    .setTableSyncModeMigration(
+                            TableSyncModeMigrationOperation.newBuilder()
+                                    .setType(TableSyncModeMigrationType.LIVE_TO_HISTORY)
+                    ))
+                    .build();
+
+            List<JDBCUtil.QueryWithCleanup> queries = JDBCUtil.generateMigrateQueries(request, testWarningHandle);
+            for (JDBCUtil.QueryWithCleanup q : queries) {
+                stmt.execute(q.getQuery());
+            }
+
+            Table t = JDBCUtil.getTable(conf, database, "liveToHistory", "liveToHistory", testWarningHandle);
+            List<Column> columns = t.getColumnsList();
+            Assertions.assertEquals("a", columns.get(0).getName());
+            Assertions.assertEquals("_fivetran_start", columns.get(1).getName());
+            Assertions.assertEquals("_fivetran_end", columns.get(2).getName());
+            Assertions.assertEquals("_fivetran_active", columns.get(3).getName());
+            Assertions.assertEquals(DataType.NAIVE_DATETIME, columns.get(1).getType());
+            Assertions.assertEquals(DataType.NAIVE_DATETIME, columns.get(2).getType());
+            Assertions.assertEquals(DataType.BOOLEAN, columns.get(3).getType());
+            Assertions.assertTrue(columns.get(1).getPrimaryKey());
+
+            checkResult("SELECT a, _fivetran_end, _fivetran_active FROM liveToHistory ORDER BY a", Arrays.asList(
+                    Arrays.asList("1", "9999-12-31 23:59:59.999999", "1"),
+                    Arrays.asList("2", "9999-12-31 23:59:59.999999", "1")
+            ));
+        }
+    }
 }
