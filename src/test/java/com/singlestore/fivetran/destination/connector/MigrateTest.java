@@ -517,4 +517,71 @@ public class MigrateTest extends IntegrationTestBase {
             ));
         }
     }
+
+    @Test
+    public void historyToLive() throws Exception {
+        try (Connection conn = JDBCUtil.createConnection(conf);
+             Statement stmt = conn.createStatement();) {
+            stmt.execute(String.format("USE %s", database));
+            stmt.execute("CREATE TABLE historyToLive(a INT PRIMARY KEY, _fivetran_start DATETIME(6), _fivetran_end DATETIME(6), _fivetran_active BOOL)");
+            stmt.execute("INSERT INTO historyToLive VALUES (1, '2020-01-01 01:01:01', '2021-01-01 01:01:01', 0), (2, '2020-01-01 01:01:01', '9999-12-31 11:59:59.999999', 1)");
+
+            MigrateRequest request = MigrateRequest.newBuilder()
+                .putAllConfiguration(confMap)
+                .setDetails(MigrationDetails.newBuilder()
+                    .setTable("historyToLive")
+                    .setSchema(database)
+                    .setTableSyncModeMigration(
+                        TableSyncModeMigrationOperation.newBuilder()
+                            .setType(TableSyncModeMigrationType.HISTORY_TO_LIVE)
+                            .setKeepDeletedRows(true)
+                    ))
+                .build();
+
+            List<JDBCUtil.QueryWithCleanup> queries = JDBCUtil.generateMigrateQueries(request, testWarningHandle);
+            for (JDBCUtil.QueryWithCleanup q : queries) {
+                stmt.execute(q.getQuery());
+            }
+
+            Table t = JDBCUtil.getTable(conf, database, "historyToLive", "historyToLive", testWarningHandle);
+            List<Column> columns = t.getColumnsList();
+            Assertions.assertEquals("a", columns.get(0).getName());
+            Assertions.assertEquals(1, columns.size());
+
+            checkResult("SELECT a FROM historyToLive ORDER BY a", Arrays.asList(
+                Collections.singletonList("1"),
+                Collections.singletonList("2")
+            ));
+
+            stmt.execute("DROP TABLE historyToLive");
+            stmt.execute("CREATE TABLE historyToLive(a INT PRIMARY KEY, _fivetran_start DATETIME(6), _fivetran_end DATETIME(6), _fivetran_active BOOL)");
+            stmt.execute("INSERT INTO historyToLive VALUES (1, '2020-01-01 01:01:01', '2021-01-01 01:01:01', 0), (2, '2020-01-01 01:01:01', '9999-12-31 11:59:59.999999', 1)");
+
+            request = MigrateRequest.newBuilder()
+                .putAllConfiguration(confMap)
+                .setDetails(MigrationDetails.newBuilder()
+                    .setTable("historyToLive")
+                    .setSchema(database)
+                    .setTableSyncModeMigration(
+                        TableSyncModeMigrationOperation.newBuilder()
+                            .setType(TableSyncModeMigrationType.HISTORY_TO_LIVE)
+                            .setKeepDeletedRows(false)
+                    ))
+                .build();
+
+            queries = JDBCUtil.generateMigrateQueries(request, testWarningHandle);
+            for (JDBCUtil.QueryWithCleanup q : queries) {
+                stmt.execute(q.getQuery());
+            }
+
+            t = JDBCUtil.getTable(conf, database, "historyToLive", "historyToLive", testWarningHandle);
+            columns = t.getColumnsList();
+            Assertions.assertEquals("a", columns.get(0).getName());
+            Assertions.assertEquals(1, columns.size());
+
+            checkResult("SELECT a FROM historyToLive ORDER BY a", Collections.singletonList(
+                Collections.singletonList("2")
+            ));
+        }
+    }
 }
