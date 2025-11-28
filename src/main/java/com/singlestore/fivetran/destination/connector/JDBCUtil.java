@@ -701,6 +701,7 @@ public class JDBCUtil {
             case TABLE_SYNC_MODE_MIGRATION:
                 TableSyncModeMigrationOperation tableSyncModeMigration = details.getTableSyncModeMigration();
                 TableSyncModeMigrationType type = tableSyncModeMigration.getType();
+                Boolean keepDeletedRows = tableSyncModeMigration.getKeepDeletedRows();
                 switch (type) {
                     case SOFT_DELETE_TO_LIVE:
                         // TODO: PLAT-7727
@@ -712,8 +713,8 @@ public class JDBCUtil {
                         // TODO: PLAT-7726
                         return new ArrayList<>();
                     case HISTORY_TO_LIVE:
-                        // TODO: PLAT-7725
-                        return new ArrayList<>();
+                        Table t = getTable(conf, database, table, details.getTable(), warningHandler);
+                        return generateMigrateHistoryToLive(t, database, table, keepDeletedRows);
                     case LIVE_TO_HISTORY:
                         // TODO: PLAT-7723
                         return new ArrayList<>();
@@ -776,5 +777,49 @@ public class JDBCUtil {
     static List<QueryWithCleanup> generateMigrateCopyTable(String tableFrom, String tableTo, String database) {
         String query = String.format("CREATE TABLE %s AS SELECT * FROM %s", escapeTable(database, tableTo), escapeTable(database, tableFrom));
         return Collections.singletonList(new QueryWithCleanup(query, null, null));
+    }
+
+    static List<QueryWithCleanup> generateMigrateHistoryToLive(Table t,
+                                                               String database,
+                                                               String table,
+                                                               Boolean keep_deleted_rows) {
+        // SingleStore doesn't support adding PK columns, so the table needs to be recreated from scratch.
+        String tempTableName = getTempName(table);
+        Table tempTable = Table.newBuilder()
+            .setName(tempTableName)
+            .addAllColumns(
+                t.getColumnsList().stream()
+                    .filter(c ->
+                        !c.getName().equals("_fivetran_start") &&
+                            !c.getName().equals("_fivetran_end") &&
+                            !c.getName().equals("_fivetran_active")
+                    )
+                    .collect(Collectors.toList())
+            ).build();
+
+        String createTableQuery = generateCreateTableQuery(database, tempTableName, tempTable);
+        String populateDataQuery = String.format("INSERT INTO %s " +
+                "SELECT %s " +
+                "FROM %s" +
+                "%s",
+            escapeTable(database, tempTableName),
+            tempTable.getColumnsList().stream().map(c -> escapeIdentifier(c.getName())).collect(Collectors.joining(", ")),
+            escapeTable(database, table),
+            keep_deleted_rows ? "" : " WHERE _fivetran_active"
+        );
+        String dropTableQuery = String.format("DROP TABLE IF EXISTS %s", escapeTable(database, table));
+        String renameTableQuery = String.format("ALTER TABLE %s RENAME %s", escapeTable(database, tempTableName), escapeIdentifier(table));
+
+        return Arrays.asList(
+            new QueryWithCleanup(createTableQuery, null, null),
+            new QueryWithCleanup(populateDataQuery, String.format("DROP TABLE IF EXISTS %s", escapeTable(database, tempTableName)), null),
+            new QueryWithCleanup(dropTableQuery, String.format("DROP TABLE IF EXISTS %s", escapeTable(database, tempTableName)), null),
+            new QueryWithCleanup(renameTableQuery, null,
+                String.format("Failed to migrate table %s to live mode. All data has been preserved in the temporary table %s. To avoid data loss, please rename %s back to %s.",
+                    escapeTable(database, table),
+                    escapeTable(database, tempTableName),
+                    escapeTable(database, tempTableName),
+                    escapeTable(database, table)))
+        );
     }
 }
