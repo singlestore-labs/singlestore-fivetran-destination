@@ -729,8 +729,7 @@ public class JDBCUtil {
                 String softDeleteColumn = tableSyncModeMigration.getSoftDeletedColumn();
                 switch (type) {
                     case SOFT_DELETE_TO_LIVE:
-                        // TODO: PLAT-7727
-                        return new ArrayList<>();
+                        return generateMigrateSoftDeleteToLive(database, table, softDeleteColumn);
                     case SOFT_DELETE_TO_HISTORY:
                         t = getTable(conf, database, table, details.getTable(), warningHandler);
                         return generateMigrateSoftDeleteToHistory(t, database, table, softDeleteColumn);
@@ -942,5 +941,21 @@ public class JDBCUtil {
                                 escapeTable(database, tempTableName),
                                 escapeTable(database, table)))
         );
+    }
+
+    static List<QueryWithCleanup> generateMigrateSoftDeleteToLive(String database,
+                                                                  String table,
+                                                                  String softDeleteColumn) {
+        String deleteRows = String.format("DELETE FROM %s WHERE %s",
+                escapeTable(database, table),
+                escapeIdentifier(softDeleteColumn)
+        );
+        String dropColumnQuery = String.format("ALTER TABLE %s DROP COLUMN %s",
+                escapeTable(database, table),
+                escapeIdentifier(softDeleteColumn)
+        );
+
+        return Arrays.asList(new QueryWithCleanup(deleteRows, null, null),
+                new QueryWithCleanup(dropColumnQuery, null, null));
     }
 }

@@ -410,4 +410,40 @@ public class MigrateTest extends IntegrationTestBase {
             ));
         }
     }
+
+    @Test
+    public void softDeleteToLive() throws Exception {
+        try (Connection conn = JDBCUtil.createConnection(conf);
+             Statement stmt = conn.createStatement();) {
+            stmt.execute(String.format("USE %s", database));
+            stmt.execute("CREATE TABLE softDeleteToLive(a INT PRIMARY KEY, _fivetran_deleted BOOL)");
+            stmt.execute("INSERT INTO softDeleteToLive VALUES (1, 0), (2, 1)");
+
+            MigrateRequest request = MigrateRequest.newBuilder()
+                .putAllConfiguration(confMap)
+                .setDetails(MigrationDetails.newBuilder()
+                    .setTable("softDeleteToLive")
+                    .setSchema(database)
+                    .setTableSyncModeMigration(
+                        TableSyncModeMigrationOperation.newBuilder()
+                            .setType(TableSyncModeMigrationType.SOFT_DELETE_TO_LIVE)
+                            .setSoftDeletedColumn("_fivetran_deleted")
+                    ))
+                .build();
+
+            List<JDBCUtil.QueryWithCleanup> queries = JDBCUtil.generateMigrateQueries(request, testWarningHandle);
+            for (JDBCUtil.QueryWithCleanup q : queries) {
+                stmt.execute(q.getQuery());
+            }
+
+            Table t = JDBCUtil.getTable(conf, database, "softDeleteToLive", "softDeleteToLive", testWarningHandle);
+            List<Column> columns = t.getColumnsList();
+            Assertions.assertEquals("a", columns.get(0).getName());
+            Assertions.assertEquals(1, columns.size());
+
+            checkResult("SELECT a FROM softDeleteToLive ORDER BY a", Collections.singletonList(
+                Collections.singletonList("1")
+            ));
+        }
+    }
 }
