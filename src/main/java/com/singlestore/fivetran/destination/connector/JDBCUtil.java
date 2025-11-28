@@ -701,10 +701,10 @@ public class JDBCUtil {
             case TABLE_SYNC_MODE_MIGRATION:
                 TableSyncModeMigrationOperation tableSyncModeMigration = details.getTableSyncModeMigration();
                 TableSyncModeMigrationType type = tableSyncModeMigration.getType();
+                String softDeleteColumn = tableSyncModeMigration.getSoftDeletedColumn();
                 switch (type) {
                     case SOFT_DELETE_TO_LIVE:
-                        // TODO: PLAT-7727
-                        return new ArrayList<>();
+                        return generateMigrateSoftDeleteToLive(database, table, softDeleteColumn);
                     case SOFT_DELETE_TO_HISTORY:
                         // TODO: PLAT-7724
                         return new ArrayList<>();
@@ -776,5 +776,21 @@ public class JDBCUtil {
     static List<QueryWithCleanup> generateMigrateCopyTable(String tableFrom, String tableTo, String database) {
         String query = String.format("CREATE TABLE %s AS SELECT * FROM %s", escapeTable(database, tableTo), escapeTable(database, tableFrom));
         return Collections.singletonList(new QueryWithCleanup(query, null, null));
+    }
+
+    static List<QueryWithCleanup> generateMigrateSoftDeleteToLive(String database,
+                                                                  String table,
+                                                                  String softDeleteColumn) {
+        String deleteRows = String.format("DELETE FROM %s WHERE %s",
+            escapeTable(database, table),
+            escapeIdentifier(softDeleteColumn)
+        );
+        String dropColumnQuery = String.format("ALTER TABLE %s DROP COLUMN %s",
+            escapeTable(database, table),
+            escapeIdentifier(softDeleteColumn)
+        );
+
+        return Arrays.asList(new QueryWithCleanup(deleteRows, null, null),
+            new QueryWithCleanup(dropColumnQuery, null, null));
     }
 }
