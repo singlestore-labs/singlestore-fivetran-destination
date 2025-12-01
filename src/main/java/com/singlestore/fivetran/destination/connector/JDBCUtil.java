@@ -648,6 +648,7 @@ public class JDBCUtil {
         String table =
             JDBCUtil.getTableName(conf, details.getSchema(), details.getTable());
 
+        Table t;
         switch (details.getOperationCase()) {
             case DROP:
                 DropOperation drop = details.getDrop();
@@ -673,7 +674,7 @@ public class JDBCUtil {
                         return generateMigrateCopyTable(tableFrom, tableTo, database);
                     case COPY_COLUMN:
                         CopyColumn migration = copy.getCopyColumn();
-                        Table t = getTable(conf, database, table, details.getTable(), warningHandler);
+                        t = getTable(conf, database, table, details.getTable(), warningHandler);
                         Column c = t.getColumnsList().stream()
                             .filter(column -> column.getName().equals(migration.getFromColumn()))
                             .findFirst()
@@ -715,7 +716,7 @@ public class JDBCUtil {
                 }
             case UPDATE_COLUMN_VALUE:
                 UpdateColumnValueOperation updateColumnValue = details.getUpdateColumnValue();
-                Table t = getTable(conf, database, table, details.getTable(), warningHandler);
+                t = getTable(conf, database, table, details.getTable(), warningHandler);
                 Column c = t.getColumnsList().stream()
                     .filter(column -> column.getName().equals(updateColumnValue.getColumn()))
                     .findFirst()
@@ -740,7 +741,7 @@ public class JDBCUtil {
                         // TODO: PLAT-7725
                         return new ArrayList<>();
                     case LIVE_TO_HISTORY:
-                        Table t = getTable(conf, database, table, details.getTable(), warningHandler);
+                        t = getTable(conf, database, table, details.getTable(), warningHandler);
                         return generateMigrateLiveToHistory(t, database, table);
                     case LIVE_TO_SOFT_DELETE:
                         return generateMigrateLiveToSoftDelete(database, table, softDeleteColumn);
