@@ -715,13 +715,8 @@ public class JDBCUtil {
                 }
             case UPDATE_COLUMN_VALUE:
                 UpdateColumnValueOperation updateColumnValue = details.getUpdateColumnValue();
-                Table t = getTable(conf, database, table, details.getTable(), warningHandler);
-                Column c = t.getColumnsList().stream()
-                    .filter(column -> column.getName().equals(updateColumnValue.getColumn()))
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalArgumentException("Source column doesn't exist"));
-
-                return generateMigrateUpdateColumnValueOperation(updateColumnValue, database, table, c.getType());
+                // TODO: PLAT-7721
+                return new ArrayList<>();
             case TABLE_SYNC_MODE_MIGRATION:
                 TableSyncModeMigrationOperation tableSyncModeMigration = details.getTableSyncModeMigration();
                 TableSyncModeMigrationType type = tableSyncModeMigration.getType();
@@ -813,15 +808,5 @@ public class JDBCUtil {
     static List<QueryWithCleanup> generateMigrateCopyTable(String tableFrom, String tableTo, String database) {
         String query = String.format("CREATE TABLE %s AS SELECT * FROM %s", escapeTable(database, tableTo), escapeTable(database, tableFrom));
         return Collections.singletonList(new QueryWithCleanup(query, null, null));
-    }
-
-    static List<QueryWithCleanup> generateMigrateUpdateColumnValueOperation(UpdateColumnValueOperation migration, String database, String table, DataType type) {
-        String sql = String.format("UPDATE %s SET %s = ?",
-            escapeTable(database, table),
-            escapeIdentifier(migration.getColumn()));
-
-        QueryWithCleanup query = new QueryWithCleanup(sql, null, null);
-        query.addParameter(migration.getValue(), type);
-        return Collections.singletonList(query);
     }
 }

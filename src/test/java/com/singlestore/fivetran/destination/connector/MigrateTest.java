@@ -254,38 +254,4 @@ public class MigrateTest extends IntegrationTestBase {
             Assertions.assertEquals(DataType.NAIVE_DATETIME, c.getType());
         }
     }
-
-    @Test
-    public void updateColumnValueOperation() throws Exception {
-        try (Connection conn = JDBCUtil.createConnection(conf);
-             Statement stmt = conn.createStatement();) {
-            stmt.execute(String.format("USE %s", database));
-            stmt.execute("CREATE TABLE updateColumnValueOperation(a INT)");
-            stmt.execute("INSERT INTO updateColumnValueOperation VALUES (1), (2), (3)");
-
-            MigrateRequest request = MigrateRequest.newBuilder()
-                .putAllConfiguration(confMap)
-                .setDetails(MigrationDetails.newBuilder()
-                    .setTable("updateColumnValueOperation")
-                    .setSchema(database)
-                    .setUpdateColumnValue(UpdateColumnValueOperation.newBuilder()
-                        .setColumn("a")
-                        .setValue("4")
-                        .build()
-                    )
-                )
-                .build();
-
-            List<JDBCUtil.QueryWithCleanup> queries = JDBCUtil.generateMigrateQueries(request, testWarningHandle);
-            for (JDBCUtil.QueryWithCleanup q : queries) {
-                q.execute(conn);
-            }
-
-            checkResult("SELECT * FROM updateColumnValueOperation ORDER BY a", Arrays.asList(
-                Collections.singletonList("4"),
-                Collections.singletonList("4"),
-                Collections.singletonList("4")
-            ));
-        }
-    }
 }
