@@ -276,16 +276,14 @@ public class SingleStoreDestinationConnectorServiceImpl extends DestinationConne
     @Override
     public void migrate(MigrateRequest request, StreamObserver<MigrateResponse> responseObserver) {
         SingleStoreConfiguration conf = new SingleStoreConfiguration(request.getConfigurationMap());
-        try (Connection conn = JDBCUtil.createConnection(conf);
-             Statement stmt = conn.createStatement()) {
+        try (Connection conn = JDBCUtil.createConnection(conf)) {
             WarningHandler wh = new WarningHandler();
             List<JDBCUtil.QueryWithCleanup> queries = JDBCUtil.generateMigrateQueries(request, wh);
             if (queries != null && !queries.isEmpty()) {
                 for (JDBCUtil.QueryWithCleanup queryWithCleanup : queries) {
                     try {
-                        String query = queryWithCleanup.getQuery();
-                        logger.info(String.format("Executing SQL:\n %s", query));
-                        stmt.execute(query);
+                        logger.info(String.format("Executing SQL:\n %s", queryWithCleanup.getQuery()));
+                        queryWithCleanup.execute(conn);
                     } catch (SQLException e) {
                         // Perform cleanup if query execution fails
                         String cleanupQuery = queryWithCleanup.getCleanupQuery();

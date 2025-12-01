@@ -105,11 +105,20 @@ public class JDBCUtil {
         private final String query;
         private final String cleanupQuery; // nullable
         private final String warningMessage;
+        private final List<String> parameterValues = new ArrayList<>();
+        private final List<DataType> parameterTypes = new ArrayList<>();
+
 
         public QueryWithCleanup(String query, String cleanupQuery, String warningMessage) {
             this.query = query;
             this.cleanupQuery = cleanupQuery;
             this.warningMessage = warningMessage;
+        }
+
+        public QueryWithCleanup addParameter(String value, DataType type) {
+            parameterValues.add(value.toString());
+            parameterTypes.add(type);
+            return this;
         }
 
         public String getQuery() {
@@ -122,6 +131,17 @@ public class JDBCUtil {
 
         public String getWarningMessage() {
             return warningMessage;
+        }
+
+        public void execute(Connection conn) throws SQLException {
+            try (PreparedStatement stmt = conn.prepareStatement(query)) {
+                for (int i = 0; i < parameterTypes.size(); i++) {
+                    String value = parameterValues.get(i);
+                    DataType type = parameterTypes.get(i);
+                    JDBCUtil.setParameter(stmt, i + 1, type, value, "NULL");
+                }
+                stmt.execute();
+            }
         }
     }
 
@@ -689,8 +709,7 @@ public class JDBCUtil {
                         // TODO: PLAT-7722
                         return new ArrayList<>();
                     case ADD_COLUMN_WITH_DEFAULT_VALUE:
-                        // TODO: PLAT-7720
-                        return new ArrayList<>();
+                        return generateMigrateAddColumnWithDefaultValue(add.getAddColumnWithDefaultValue(), table, database);
                     default:
                         throw new IllegalArgumentException("Unsupported add operation");
                 }
@@ -731,6 +750,19 @@ public class JDBCUtil {
     static List<QueryWithCleanup> generateMigrateDropQueries(String table, String database) {
         String query = String.format("DROP TABLE IF EXISTS %s", escapeTable(database, table));
         return Collections.singletonList(new QueryWithCleanup(query, null, null));
+    }
+
+    static List<QueryWithCleanup> generateMigrateAddColumnWithDefaultValue(AddColumnWithDefaultValue migration, String table, String database) {
+        String column = migration.getColumn();
+        DataType type = migration.getColumnType();
+        String defaultValue = migration.getDefaultValue();
+        String query = String.format("ALTER TABLE %s ADD COLUMN %s %s DEFAULT ?",
+            escapeTable(database, table), escapeIdentifier(column),
+            mapDataTypes(type, null));
+
+        QueryWithCleanup alterQuery = new QueryWithCleanup(query, null, null);
+        alterQuery.addParameter(defaultValue, type);
+        return Collections.singletonList(alterQuery);
     }
 
     static List<QueryWithCleanup> generateMigrateRenameTable(String tableFrom, String tableTo, String database) {
