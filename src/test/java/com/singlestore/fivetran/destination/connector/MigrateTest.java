@@ -288,4 +288,41 @@ public class MigrateTest extends IntegrationTestBase {
             ));
         }
     }
+
+    @Test
+    public void liveToSoftDelete() throws Exception {
+        try (Connection conn = JDBCUtil.createConnection(conf);
+             Statement stmt = conn.createStatement();) {
+            stmt.execute(String.format("USE %s", database));
+            stmt.execute("CREATE TABLE liveToSoftDelete(a INT)");
+            stmt.execute("INSERT INTO liveToSoftDelete VALUES (1), (2)");
+
+            MigrateRequest request = MigrateRequest.newBuilder()
+                    .putAllConfiguration(confMap)
+                    .setDetails(MigrationDetails.newBuilder()
+            .setTable("liveToSoftDelete")
+                    .setSchema(database)
+                    .setTableSyncModeMigration(
+                            TableSyncModeMigrationOperation.newBuilder()
+                                    .setType(TableSyncModeMigrationType.LIVE_TO_SOFT_DELETE)
+                                    .setSoftDeletedColumn("b")
+                    ))
+                    .build();
+
+            List<JDBCUtil.QueryWithCleanup> queries = JDBCUtil.generateMigrateQueries(request, testWarningHandle);
+            for (JDBCUtil.QueryWithCleanup q : queries) {
+                stmt.execute(q.getQuery());
+            }
+
+            Table t = JDBCUtil.getTable(conf, database, "liveToSoftDelete", "liveToSoftDelete", testWarningHandle);
+            List<Column> columns = t.getColumnsList();
+            Assertions.assertEquals("a", columns.get(0).getName());
+            Assertions.assertEquals("b", columns.get(1).getName());
+
+            checkResult("SELECT a, b FROM liveToSoftDelete ORDER BY a", Arrays.asList(
+                    Arrays.asList("1", "0"),
+                    Arrays.asList("2", "0")
+            ));
+        }
+    }
 }
