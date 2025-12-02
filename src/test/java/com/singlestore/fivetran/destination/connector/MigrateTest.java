@@ -446,4 +446,75 @@ public class MigrateTest extends IntegrationTestBase {
             ));
         }
     }
+
+    @Test
+    public void historyToSoftDelete() throws Exception {
+        try (Connection conn = JDBCUtil.createConnection(conf);
+             Statement stmt = conn.createStatement();) {
+            stmt.execute(String.format("USE %s", database));
+            stmt.execute("CREATE TABLE historyToSoftDelete(a INT, _fivetran_start DATETIME(6), _fivetran_end DATETIME(6), _fivetran_active BOOL, PRIMARY KEY(_fivetran_start, a))");
+            stmt.execute("INSERT INTO historyToSoftDelete VALUES " +
+                    "(1, '2020-01-01 01:01:01', '2021-01-01 01:01:01', 0), " +
+                    "(1, '2021-01-01 01:01:01', '9999-12-31 11:59:59.999999', 1), " +
+                    "(2, '2020-01-01 01:01:01', '9999-12-31 11:59:59.999999', 1), " +
+                    "(3, '2020-01-01 01:01:01', '2021-01-01 01:01:01', 0)");
+
+            MigrateRequest request = MigrateRequest.newBuilder()
+                    .putAllConfiguration(confMap)
+                    .setDetails(MigrationDetails.newBuilder()
+                            .setTable("historyToSoftDelete")
+                            .setSchema(database)
+                            .setTableSyncModeMigration(
+                                    TableSyncModeMigrationOperation.newBuilder()
+                                            .setType(TableSyncModeMigrationType.HISTORY_TO_SOFT_DELETE)
+                                            .setSoftDeletedColumn("_fivetran_deleted")
+                            ))
+                    .build();
+
+            List<JDBCUtil.QueryWithCleanup> queries = JDBCUtil.generateMigrateQueries(request, testWarningHandle);
+            for (JDBCUtil.QueryWithCleanup q : queries) {
+                System.out.println(q.getQuery());
+                stmt.execute(q.getQuery());
+            }
+
+            Table t = JDBCUtil.getTable(conf, database, "historyToSoftDelete", "historyToSoftDelete", testWarningHandle);
+            List<Column> columns = t.getColumnsList();
+            Assertions.assertEquals("a", columns.get(0).getName());
+            Assertions.assertEquals("_fivetran_deleted", columns.get(1).getName());
+            Assertions.assertEquals(2, columns.size());
+
+            checkResult("SELECT a, _fivetran_deleted FROM historyToSoftDelete ORDER BY a", Arrays.asList(
+                    Arrays.asList("1", "0"),
+                    Arrays.asList("2", "0"),
+                    Arrays.asList("3", "1")
+            ));
+
+            stmt.execute("DROP TABLE historyToSoftDelete");
+            stmt.execute("CREATE TABLE historyToSoftDelete(a INT, _fivetran_start DATETIME(6), _fivetran_end DATETIME(6), _fivetran_active BOOL, PRIMARY KEY(_fivetran_start))");
+            stmt.execute("INSERT INTO historyToSoftDelete VALUES " +
+                    "(1, '2020-01-01 01:01:01', '2021-01-01 01:01:01', 0), " +
+                    "(1, '2021-01-01 01:01:01', '9999-12-31 11:59:59.999999', 1), " +
+                    "(2, '2022-01-01 01:01:01', '9999-12-31 11:59:59.999999', 1), " +
+                    "(3, '2023-01-01 01:01:01', '2021-01-01 01:01:01', 0)");
+
+            queries = JDBCUtil.generateMigrateQueries(request, testWarningHandle);
+            for (JDBCUtil.QueryWithCleanup q : queries) {
+                System.out.println(q.getQuery());
+                stmt.execute(q.getQuery());
+            }
+
+            t = JDBCUtil.getTable(conf, database, "historyToSoftDelete", "historyToSoftDelete", testWarningHandle);
+            columns = t.getColumnsList();
+            Assertions.assertEquals("a", columns.get(0).getName());
+            Assertions.assertEquals("_fivetran_deleted", columns.get(1).getName());
+            Assertions.assertEquals(2, columns.size());
+
+            checkResult("SELECT a, _fivetran_deleted FROM historyToSoftDelete ORDER BY a, _fivetran_deleted", Arrays.asList(
+                    Arrays.asList("1", "0"),
+                    Arrays.asList("1", "1"),
+                    Arrays.asList("2", "0"),
+                    Arrays.asList("3", "1")
+            ));
+        }
+    }
 }

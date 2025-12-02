@@ -734,8 +734,8 @@ public class JDBCUtil {
                         t = getTable(conf, database, table, details.getTable(), warningHandler);
                         return generateMigrateSoftDeleteToHistory(t, database, table, softDeleteColumn);
                     case HISTORY_TO_SOFT_DELETE:
-                        // TODO: PLAT-7726
-                        return new ArrayList<>();
+                        t = getTable(conf, database, table, details.getTable(), warningHandler);
+                        return generateMigrateHistoryToSoftDelete(t, database, table, softDeleteColumn);
                     case HISTORY_TO_LIVE:
                         // TODO: PLAT-7725
                         return new ArrayList<>();
@@ -927,6 +927,7 @@ public class JDBCUtil {
                 escapeIdentifier(softDeleteColumn),
                 escapeTable(database, table)
         );
+
         String dropTableQuery = String.format("DROP TABLE IF EXISTS %s", escapeTable(database, table));
         String renameTableQuery = String.format("ALTER TABLE %s RENAME %s", escapeTable(database, tempTableName), escapeIdentifier(table));
 
@@ -935,7 +936,7 @@ public class JDBCUtil {
                 new QueryWithCleanup(populateDataQuery, String.format("DROP TABLE IF EXISTS %s", escapeTable(database, tempTableName)), null),
                 new QueryWithCleanup(dropTableQuery, String.format("DROP TABLE IF EXISTS %s", escapeTable(database, tempTableName)), null),
                 new QueryWithCleanup(renameTableQuery, null,
-                        String.format("Failed to migrate table %s to history mode. All data has been preserved in the temporary table %s. To avoid data loss, please rename %s back to %s.",
+                        String.format("Failed to migrate table %s to soft delete mode. All data has been preserved in the temporary table %s. To avoid data loss, please rename %s back to %s.",
                                 escapeTable(database, table),
                                 escapeTable(database, tempTableName),
                                 escapeTable(database, tempTableName),
@@ -957,5 +958,72 @@ public class JDBCUtil {
 
         return Arrays.asList(new QueryWithCleanup(deleteRows, null, null),
                 new QueryWithCleanup(dropColumnQuery, null, null));
+    }
+
+    static List<QueryWithCleanup> generateMigrateHistoryToSoftDelete(Table t,
+                                                                     String database,
+                                                                     String table,
+                                                                     String softDeletedColumn) {
+        // SingleStore doesn't support adding PK columns, so the table needs to be recreated from scratch.
+        String tempTableName = getTempName(table);
+        List<Column> tempTableColumns = t.getColumnsList().stream()
+                .filter(c ->
+                        !c.getName().equals("_fivetran_start") &&
+                                !c.getName().equals("_fivetran_end") &&
+                                !c.getName().equals("_fivetran_active")
+                )
+                .collect(Collectors.toList());
+        tempTableColumns.add(Column.newBuilder()
+                .setName(softDeletedColumn)
+                .setType(DataType.BOOLEAN)
+                .build()
+        );
+
+        Table tempTable = Table.newBuilder()
+                .setName(tempTableName)
+                .addAllColumns(tempTableColumns).build();
+
+        String createTableQuery = generateCreateTableQuery(database, tempTableName, tempTable);
+        String populateDataQuery;
+        if (tempTableColumns.stream().noneMatch(Column::getPrimaryKey)) {
+            populateDataQuery = String.format("INSERT INTO %s " +
+                            "SELECT %s, IF(_fivetran_active, FALSE, TRUE) AS %s" +
+                            "FROM %s",
+                    escapeTable(database, tempTableName),
+                    tempTableColumns.stream().filter(c -> !c.getName().equals(softDeletedColumn))
+                            .map(c -> escapeIdentifier(c.getName())).collect(Collectors.joining(", ")),
+                    escapeIdentifier(softDeletedColumn),
+                    escapeTable(database, table)
+            );
+        } else {
+            populateDataQuery = String.format("INSERT INTO %s " +
+                            "SELECT %s, IF(_fivetran_active, FALSE, TRUE) AS %s " +
+                            "FROM (" +
+                            " SELECT *, ROW_NUMBER() OVER (PARTITION BY %s ORDER BY _fivetran_start DESC) as rn FROM %s" +
+                            ") ranked " +
+                            "WHERE rn = 1",
+                    escapeTable(database, tempTableName),
+                    tempTableColumns.stream().filter(c -> !c.getName().equals(softDeletedColumn))
+                            .map(c -> escapeIdentifier(c.getName())).collect(Collectors.joining(", ")),
+                    escapeIdentifier(softDeletedColumn),
+                    tempTableColumns.stream().filter(Column::getPrimaryKey)
+                            .map(c -> escapeIdentifier(c.getName())).collect(Collectors.joining(", ")),
+                    escapeTable(database, table)
+            );
+        }
+        String dropTableQuery = String.format("DROP TABLE IF EXISTS %s", escapeTable(database, table));
+        String renameTableQuery = String.format("ALTER TABLE %s RENAME %s", escapeTable(database, tempTableName), escapeIdentifier(table));
+
+        return Arrays.asList(
+                new QueryWithCleanup(createTableQuery, null, null),
+                new QueryWithCleanup(populateDataQuery, String.format("DROP TABLE IF EXISTS %s", escapeTable(database, tempTableName)), null),
+                new QueryWithCleanup(dropTableQuery, String.format("DROP TABLE IF EXISTS %s", escapeTable(database, tempTableName)), null),
+                new QueryWithCleanup(renameTableQuery, null,
+                        String.format("Failed to migrate table %s to soft delete mode. All data has been preserved in the temporary table %s. To avoid data loss, please rename %s back to %s.",
+                                escapeTable(database, table),
+                                escapeTable(database, tempTableName),
+                                escapeTable(database, tempTableName),
+                                escapeTable(database, table)))
+        );
     }
 }
