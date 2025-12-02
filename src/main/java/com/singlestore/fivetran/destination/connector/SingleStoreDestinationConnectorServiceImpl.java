@@ -277,49 +277,64 @@ public class SingleStoreDestinationConnectorServiceImpl extends DestinationConne
     public void migrate(MigrateRequest request, StreamObserver<MigrateResponse> responseObserver) {
         SingleStoreConfiguration conf = new SingleStoreConfiguration(request.getConfigurationMap());
         try (Connection conn = JDBCUtil.createConnection(conf)) {
+            conn.setAutoCommit(false);
+
             WarningHandler wh = new WarningHandler();
             List<JDBCUtil.QueryWithCleanup> queries = JDBCUtil.generateMigrateQueries(request, wh);
-            if (queries != null && !queries.isEmpty()) {
-                for (JDBCUtil.QueryWithCleanup queryWithCleanup : queries) {
-                    try {
-                        logger.info(String.format("Executing SQL:\n %s", queryWithCleanup.getQuery()));
-                        queryWithCleanup.execute(conn);
-                    } catch (SQLException e) {
-                        // Perform cleanup if query execution fails
-                        String cleanupQuery = queryWithCleanup.getCleanupQuery();
-                        if (cleanupQuery != null) {
-                            try (Statement cleanupStmt = conn.createStatement()) {
-                                logger.info(String.format("Executing cleanup SQL:\n %s", cleanupQuery));
-                                cleanupStmt.execute(cleanupQuery);
+            try {
+                if (queries != null && !queries.isEmpty()) {
+                    for (JDBCUtil.QueryWithCleanup queryWithCleanup : queries) {
+                        try {
+                            logger.info(String.format("Executing SQL:\n %s", queryWithCleanup.getQuery()));
+                            queryWithCleanup.execute(conn);
+                        } catch (SQLException e) {
+                            // Perform cleanup if query execution fails
+                            String cleanupQuery = queryWithCleanup.getCleanupQuery();
+                            if (cleanupQuery != null) {
+                                try (Statement cleanupStmt = conn.createStatement()) {
+                                    logger.info(String.format("Executing cleanup SQL:\n %s", cleanupQuery));
+                                    cleanupStmt.execute(cleanupQuery);
+                                }
                             }
-                        }
 
-                        String warning = queryWithCleanup.getWarningMessage();
-                        if (warning != null) {
-                            wh.handle(warning);
-                        }
+                            String warning = queryWithCleanup.getWarningMessage();
+                            if (warning != null) {
+                                wh.handle(warning);
+                            }
 
-                        throw e;
+                            throw e;
+                        }
                     }
                 }
+
+                conn.commit();
+            } catch (SQLException e) {
+                try {
+                    conn.rollback();
+                } catch (SQLException rollbackEx) {
+                    // keep original error, attach rollback failure as suppressed
+                    e.addSuppressed(rollbackEx);
+                }
+                throw e; // propagate to caller
             }
+
 
             responseObserver.onNext(MigrateResponse.newBuilder().setSuccess(true).build());
             responseObserver.onCompleted();
         } catch (Exception e) {
             String database = JDBCUtil.getDatabaseName(conf, request.getDetails().getSchema());
             String table = JDBCUtil.getTableName(conf, request.getDetails().getSchema(),
-                request.getDetails().getTable());
+                    request.getDetails().getTable());
             logger.warn(String.format("Migrate failed for %s",
-                JDBCUtil.escapeTable(database, table)), e);
+                    JDBCUtil.escapeTable(database, table)), e);
 
             responseObserver.onNext(MigrateResponse.newBuilder()
-                .setTask(Task.newBuilder()
-                    .setMessage(e.getMessage()).build())
-                .build());
+                    .setTask(Task.newBuilder()
+                            .setMessage(e.getMessage()).build())
+                    .build());
             responseObserver.onNext(MigrateResponse.newBuilder()
-                .setSuccess(false)
-                .build());
+                    .setSuccess(false)
+                    .build());
             responseObserver.onCompleted();
         }
     }

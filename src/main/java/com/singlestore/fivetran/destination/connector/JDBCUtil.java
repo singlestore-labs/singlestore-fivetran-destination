@@ -640,6 +640,25 @@ public class JDBCUtil {
         return originalName + "_tmp_" + Integer.toHexString(new Random().nextInt(0x1000000));
     }
 
+    private static boolean checkTableNonEmpty(Connection connection, String database, String table) throws SQLException {
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM " + escapeTable(database, table))) {
+            return rs.getLong(1) > 0;
+        }
+    }
+
+    private static boolean checkMaxStartTime(Connection connection, String database, String table, String maxTime) throws SQLException {
+        try (
+                PreparedStatement stmt = connection.prepareStatement(
+                        String.format("SELECT MAX(_fivetran_start) < ? FROM %s", escapeTable(database, table)));
+        ) {
+            setParameter(stmt, 1, DataType.NAIVE_DATETIME, maxTime, "NULL");
+            try (ResultSet rs = stmt.executeQuery()) {
+                return rs.getBoolean(1);
+            }
+        }
+    }
+
     static List<QueryWithCleanup> generateMigrateQueries(MigrateRequest request, WarningHandler warningHandler) throws Exception {
         SingleStoreConfiguration conf = new SingleStoreConfiguration(request.getConfigurationMap());
 
@@ -1153,5 +1172,42 @@ public class JDBCUtil {
                 new QueryWithCleanup(createTableQuery, null, null),
                 new QueryWithCleanup(populateDataQuery, String.format("DROP TABLE IF EXISTS %s", escapeTable(database, toTable)), null)
         );
+    }
+
+    static List<QueryWithCleanup> generateDropColumnInHistoryMode(DropColumnInHistoryMode migration, Table t, String database, String table) {
+        String column = migration.getColumn();
+        String operationTimestamp = migration.getOperationTimestamp();
+
+        QueryWithCleanup insertQuery = new QueryWithCleanup(String.format("INSERT INTO %s (%s, %s, _fivetran_start) " +
+                        "SELECT %s, NULL as %s, ? AS _fivetran_start" +
+                        "FROM %s " +
+                        "WHERE _fivetran_active AND %s IS NOT NULL AND _fivetran_start < ?",
+                escapeTable(database, table),
+                t.getColumnsList().stream()
+                        .filter(c -> !c.getName().equals(column) && !c.getName().equals("_fivetran_start"))
+                        .map(c -> escapeIdentifier(c.getName()))
+                        .collect(Collectors.joining(", ")),
+                escapeIdentifier(column),
+                t.getColumnsList().stream()
+                        .filter(c -> !c.getName().equals(column) && !c.getName().equals("_fivetran_start"))
+                        .map(c -> escapeIdentifier(c.getName()))
+                        .collect(Collectors.joining(", ")),
+                escapeIdentifier(column),
+                escapeTable(database, table),
+                escapeIdentifier(column)
+        ), null, null);
+        insertQuery.addParameter(operationTimestamp, DataType.NAIVE_DATETIME);
+        insertQuery.addParameter(operationTimestamp, DataType.NAIVE_DATETIME);
+
+        QueryWithCleanup updateQuery = new QueryWithCleanup(String.format("UPDATE %s " +
+                        "SET _fivetran_end = DATE_SUB(?,  INTERVAL 1 MICROSECOND), _fivetran_active = FALSE " +
+                        "WHERE _fivetran_active AND %s IS NOT NULL AND _fivetran_start < ?",
+                escapeTable(database, table),
+                escapeIdentifier(column)
+        ), null, null);
+        updateQuery.addParameter(operationTimestamp, DataType.NAIVE_DATETIME);
+        updateQuery.addParameter(operationTimestamp, DataType.NAIVE_DATETIME);
+
+        return Arrays.asList(insertQuery, updateQuery);
     }
 }
