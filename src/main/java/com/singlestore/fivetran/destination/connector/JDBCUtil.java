@@ -682,8 +682,16 @@ public class JDBCUtil {
 
                         return generateMigrateCopyColumn(copy.getCopyColumn(), database, table, c);
                     case COPY_TABLE_TO_HISTORY_MODE:
-                        // TODO: PLAT-7717
-                        return new ArrayList<>();
+                        CopyTableToHistoryMode copyTableToHistoryModeMigration = copy.getCopyTableToHistoryMode();
+                        String tableFromHM =
+                                JDBCUtil.getTableName(conf, details.getSchema(), copyTableToHistoryModeMigration.getFromTable());
+                        String tableToHM =
+                                JDBCUtil.getTableName(conf, details.getSchema(), copyTableToHistoryModeMigration.getToTable());
+
+                        t = getTable(conf, database, tableFromHM, copyTableToHistoryModeMigration.getFromTable(), warningHandler);
+
+                        return generateMigrateCopyTableToHistoryMode(t,
+                                database, tableFromHM, tableToHM, copyTableToHistoryModeMigration.getSoftDeletedColumn());
                     default:
                         throw new IllegalArgumentException("Unsupported copy operation");
                 }
@@ -1069,6 +1077,81 @@ public class JDBCUtil {
                                 escapeTable(database, tempTableName),
                                 escapeTable(database, tempTableName),
                                 escapeTable(database, table)))
+        );
+    }
+
+    static List<QueryWithCleanup> generateMigrateCopyTableToHistoryMode(Table t,
+                                                                        String database,
+                                                                        String fromTable,
+                                                                        String toTable,
+                                                                        String softDeleteColumn) {
+        List<Column> newTableColumns = new ArrayList<>(t.getColumnsList());
+        if (softDeleteColumn != null && !softDeleteColumn.isEmpty()) {
+            newTableColumns = newTableColumns.stream()
+                    .filter(c -> !c.getName().equals(softDeleteColumn))
+                    .collect(Collectors.toList());
+        }
+        newTableColumns.add(
+                Column.newBuilder()
+                        .setName("_fivetran_start")
+                        .setType(DataType.NAIVE_DATETIME)
+                        .setPrimaryKey(true)
+                        .build()
+        );
+        newTableColumns.add(
+                Column.newBuilder()
+                        .setName("_fivetran_end")
+                        .setType(DataType.NAIVE_DATETIME)
+                        .build()
+        );
+        newTableColumns.add(
+                Column.newBuilder()
+                        .setName("_fivetran_active")
+                        .setType(DataType.BOOLEAN)
+                        .build()
+        );
+
+        Table newTable = Table.newBuilder()
+                .setName(toTable)
+                .addAllColumns(newTableColumns)
+                .build();
+
+        String createTableQuery = generateCreateTableQuery(database, toTable, newTable);
+        String populateDataQuery;
+        if (softDeleteColumn == null || softDeleteColumn.isEmpty()) {
+            populateDataQuery = String.format("INSERT INTO %s " +
+                            "SELECT *, " +
+                            "NOW() AS `_fivetran_start`, " +
+                            "'9999-12-31 23:59:59.999999' AS `_fivetran_end`, " +
+                            "TRUE AS `_fivetran_active` " +
+                            "FROM %s",
+                    escapeTable(database, toTable),
+                    escapeTable(database, fromTable)
+            );
+
+        } else {
+            populateDataQuery = String.format("INSERT INTO %s " +
+                            "WITH _last_sync AS (SELECT MAX(_fivetran_synced) AS _last_sync FROM %s)" +
+                            "SELECT %s, " +
+                            "IF(%s, '1000-01-01 00:00:00.000000', (SELECT _last_sync FROM _last_sync)) AS `_fivetran_start`, " +
+                            "IF(%s, '1000-01-01 00:00:00.000000', '9999-12-31 23:59:59.999999') AS `_fivetran_end`, " +
+                            "IF(%s, FALSE, TRUE) AS `_fivetran_active` " +
+                            "FROM %s",
+                    escapeTable(database, toTable),
+                    escapeTable(database, fromTable),
+                    t.getColumnsList().stream()
+                            .filter(c -> !c.getName().equals(softDeleteColumn))
+                            .map(c -> escapeIdentifier(c.getName())).collect(Collectors.joining(", ")),
+                    escapeIdentifier(softDeleteColumn),
+                    escapeIdentifier(softDeleteColumn),
+                    escapeIdentifier(softDeleteColumn),
+                    escapeTable(database, fromTable)
+            );
+        }
+
+        return Arrays.asList(
+                new QueryWithCleanup(createTableQuery, null, null),
+                new QueryWithCleanup(populateDataQuery, String.format("DROP TABLE IF EXISTS %s", escapeTable(database, toTable)), null)
         );
     }
 }
