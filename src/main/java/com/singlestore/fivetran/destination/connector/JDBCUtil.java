@@ -727,6 +727,7 @@ public class JDBCUtil {
                 TableSyncModeMigrationOperation tableSyncModeMigration = details.getTableSyncModeMigration();
                 TableSyncModeMigrationType type = tableSyncModeMigration.getType();
                 String softDeleteColumn = tableSyncModeMigration.getSoftDeletedColumn();
+                Boolean keepDeletedRows = tableSyncModeMigration.getKeepDeletedRows();
                 switch (type) {
                     case SOFT_DELETE_TO_LIVE:
                         return generateMigrateSoftDeleteToLive(database, table, softDeleteColumn);
@@ -737,8 +738,8 @@ public class JDBCUtil {
                         t = getTable(conf, database, table, details.getTable(), warningHandler);
                         return generateMigrateHistoryToSoftDelete(t, database, table, softDeleteColumn);
                     case HISTORY_TO_LIVE:
-                        // TODO: PLAT-7725
-                        return new ArrayList<>();
+                        t = getTable(conf, database, table, details.getTable(), warningHandler);
+                        return generateMigrateHistoryToLive(t, database, table, keepDeletedRows);
                     case LIVE_TO_HISTORY:
                         t = getTable(conf, database, table, details.getTable(), warningHandler);
                         return generateMigrateLiveToHistory(t, database, table);
@@ -1020,6 +1021,50 @@ public class JDBCUtil {
                 new QueryWithCleanup(dropTableQuery, String.format("DROP TABLE IF EXISTS %s", escapeTable(database, tempTableName)), null),
                 new QueryWithCleanup(renameTableQuery, null,
                         String.format("Failed to migrate table %s to soft delete mode. All data has been preserved in the temporary table %s. To avoid data loss, please rename %s back to %s.",
+                                escapeTable(database, table),
+                                escapeTable(database, tempTableName),
+                                escapeTable(database, tempTableName),
+                                escapeTable(database, table)))
+        );
+    }
+
+    static List<QueryWithCleanup> generateMigrateHistoryToLive(Table t,
+                                                               String database,
+                                                               String table,
+                                                               Boolean keep_deleted_rows) {
+        // SingleStore doesn't support adding PK columns, so the table needs to be recreated from scratch.
+        String tempTableName = getTempName(table);
+        Table tempTable = Table.newBuilder()
+                .setName(tempTableName)
+                .addAllColumns(
+                        t.getColumnsList().stream()
+                                .filter(c ->
+                                        !c.getName().equals("_fivetran_start") &&
+                                                !c.getName().equals("_fivetran_end") &&
+                                                !c.getName().equals("_fivetran_active")
+                                )
+                                .collect(Collectors.toList())
+                ).build();
+
+        String createTableQuery = generateCreateTableQuery(database, tempTableName, tempTable);
+        String populateDataQuery = String.format("INSERT INTO %s " +
+                        "SELECT %s " +
+                        "FROM %s" +
+                        "%s",
+                escapeTable(database, tempTableName),
+                tempTable.getColumnsList().stream().map(c -> escapeIdentifier(c.getName())).collect(Collectors.joining(", ")),
+                escapeTable(database, table),
+                keep_deleted_rows ? "" : " WHERE _fivetran_active"
+        );
+        String dropTableQuery = String.format("DROP TABLE IF EXISTS %s", escapeTable(database, table));
+        String renameTableQuery = String.format("ALTER TABLE %s RENAME %s", escapeTable(database, tempTableName), escapeIdentifier(table));
+
+        return Arrays.asList(
+                new QueryWithCleanup(createTableQuery, null, null),
+                new QueryWithCleanup(populateDataQuery, String.format("DROP TABLE IF EXISTS %s", escapeTable(database, tempTableName)), null),
+                new QueryWithCleanup(dropTableQuery, String.format("DROP TABLE IF EXISTS %s", escapeTable(database, tempTableName)), null),
+                new QueryWithCleanup(renameTableQuery, null,
+                        String.format("Failed to migrate table %s to live mode. All data has been preserved in the temporary table %s. To avoid data loss, please rename %s back to %s.",
                                 escapeTable(database, table),
                                 escapeTable(database, tempTableName),
                                 escapeTable(database, tempTableName),
