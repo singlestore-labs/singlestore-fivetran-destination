@@ -672,4 +672,85 @@ public class MigrateTest extends IntegrationTestBase {
             ));
         }
     }
+
+    @Test
+    public void dropColumnInHistoryMode() throws Exception {
+        try (Connection conn = JDBCUtil.createConnection(conf);
+             Statement stmt = conn.createStatement();) {
+            stmt.execute(String.format("USE %s", database));
+            stmt.execute("CREATE TABLE dropColumnInHistoryMode(a INT, b INT, _fivetran_start DATETIME(6), _fivetran_end DATETIME(6), _fivetran_active BOOL, PRIMARY KEY(_fivetran_start, a))");
+
+            final MigrateRequest emptyRequest = MigrateRequest.newBuilder()
+                .putAllConfiguration(confMap)
+                .setDetails(MigrationDetails.newBuilder()
+                    .setTable("dropColumnInHistoryMode")
+                    .setSchema(database)
+                    .setDrop(
+                        DropOperation.newBuilder()
+                            .setDropColumnInHistoryMode(
+                                DropColumnInHistoryMode.newBuilder()
+                                    .setColumn("b")
+                                    .setOperationTimestamp("2021-01-01 01:01:01")
+                            )
+                    )
+                ).build();
+            List<JDBCUtil.QueryWithCleanup> queries = JDBCUtil.generateMigrateQueries(emptyRequest, testWarningHandle);
+            Assertions.assertEquals(0, queries.size());
+
+            stmt.execute("INSERT INTO dropColumnInHistoryMode VALUES (1, 1, '2020-01-01 01:01:01', '2021-01-01 01:01:01', 0), (2, 2, '2020-01-01 01:01:01', '9999-12-31 11:59:59.999999', 1)");
+
+            MigrateRequest request = MigrateRequest.newBuilder()
+                .putAllConfiguration(confMap)
+                .setDetails(MigrationDetails.newBuilder()
+                    .setTable("dropColumnInHistoryMode")
+                    .setSchema(database)
+                    .setDrop(
+                        DropOperation.newBuilder()
+                            .setDropColumnInHistoryMode(
+                                DropColumnInHistoryMode.newBuilder()
+                                    .setColumn("b")
+                                    .setOperationTimestamp("2021-01-01 01:01:01")
+                            )
+                    )
+                ).build();
+
+            queries = JDBCUtil.generateMigrateQueries(request, testWarningHandle);
+            for (JDBCUtil.QueryWithCleanup q : queries) {
+                q.execute(conn);
+            }
+
+            Table t = JDBCUtil.getTable(conf, database, "dropColumnInHistoryMode", "dropColumnInHistoryMode", testWarningHandle);
+            List<Column> columns = t.getColumnsList();
+            Assertions.assertEquals("a", columns.get(0).getName());
+            Assertions.assertEquals("b", columns.get(1).getName());
+            Assertions.assertEquals("_fivetran_start", columns.get(2).getName());
+            Assertions.assertEquals("_fivetran_end", columns.get(3).getName());
+            Assertions.assertEquals("_fivetran_active", columns.get(4).getName());
+            Assertions.assertEquals(5, columns.size());
+
+            checkResult("SELECT * FROM dropColumnInHistoryMode ORDER BY _fivetran_start, a", Arrays.asList(
+                Arrays.asList("1", "1", "2020-01-01 01:01:01.000000", "2021-01-01 01:01:01.000000", "0"),
+                Arrays.asList("2", "2", "2020-01-01 01:01:01.000000", "2021-01-01 01:01:00.999999", "0"),
+                Arrays.asList("2", null, "2021-01-01 01:01:01.000000", "9999-12-31 11:59:59.999999", "1")
+            ));
+
+            Assertions.assertThrows(IllegalArgumentException.class, () -> {
+                final MigrateRequest invalidRequest = MigrateRequest.newBuilder()
+                    .putAllConfiguration(confMap)
+                    .setDetails(MigrationDetails.newBuilder()
+                        .setTable("dropColumnInHistoryMode")
+                        .setSchema(database)
+                        .setDrop(
+                            DropOperation.newBuilder()
+                                .setDropColumnInHistoryMode(
+                                    DropColumnInHistoryMode.newBuilder()
+                                        .setColumn("b")
+                                        .setOperationTimestamp("2001-01-01 01:01:01")
+                                )
+                        )
+                    ).build();
+                JDBCUtil.generateMigrateQueries(invalidRequest, testWarningHandle);
+            });
+        }
+    }
 }

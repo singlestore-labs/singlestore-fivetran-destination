@@ -640,20 +640,24 @@ public class JDBCUtil {
         return originalName + "_tmp_" + Integer.toHexString(new Random().nextInt(0x1000000));
     }
 
-    private static boolean checkTableNonEmpty(Connection connection, String database, String table) throws SQLException {
-        try (Statement stmt = connection.createStatement();
+    private static boolean checkTableNonEmpty(SingleStoreConfiguration conf, String database, String table) throws Exception {
+        try (Connection conn = JDBCUtil.createConnection(conf);
+            Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM " + escapeTable(database, table))) {
+            rs.next();
             return rs.getLong(1) > 0;
         }
     }
 
-    private static boolean checkMaxStartTime(Connection connection, String database, String table, String maxTime) throws SQLException {
+    private static boolean checkMaxStartTime(SingleStoreConfiguration conf, String database, String table, String maxTime) throws Exception {
         try (
-                PreparedStatement stmt = connection.prepareStatement(
-                        String.format("SELECT MAX(_fivetran_start) < ? FROM %s", escapeTable(database, table)));
+            Connection conn = JDBCUtil.createConnection(conf);
+            PreparedStatement stmt = conn.prepareStatement(
+                String.format("SELECT MAX(_fivetran_start) < ? FROM %s", escapeTable(database, table)));
         ) {
             setParameter(stmt, 1, DataType.NAIVE_DATETIME, maxTime, "NULL");
             try (ResultSet rs = stmt.executeQuery()) {
+                rs.next();
                 return rs.getBoolean(1);
             }
         }
@@ -675,8 +679,17 @@ public class JDBCUtil {
                     case DROP_TABLE:
                         return generateMigrateDropQueries(table, database);
                     case DROP_COLUMN_IN_HISTORY_MODE:
-                        // TODO: PLAT-7714
-                        return new ArrayList<>();
+                        DropColumnInHistoryMode dropColumnInHistoryMode = drop.getDropColumnInHistoryMode();
+
+                        if (!checkTableNonEmpty(conf, database, table)) {
+                            return new ArrayList<>();
+                        }
+                        if (!checkMaxStartTime(conf, database, table, dropColumnInHistoryMode.getOperationTimestamp())) {
+                            throw new IllegalArgumentException("Cannot drop column in history mode because maximum _fivetran_start is greater then the operation timestamp");
+                        }
+
+                        t = getTable(conf, database, table, details.getTable(), warningHandler);
+                        return generateDropColumnInHistoryMode(drop.getDropColumnInHistoryMode(), t, database, table);
                     default:
                         throw new IllegalArgumentException("Unsupported drop operation");
                 }
@@ -1179,7 +1192,7 @@ public class JDBCUtil {
         String operationTimestamp = migration.getOperationTimestamp();
 
         QueryWithCleanup insertQuery = new QueryWithCleanup(String.format("INSERT INTO %s (%s, %s, _fivetran_start) " +
-                        "SELECT %s, NULL as %s, ? AS _fivetran_start" +
+                        "SELECT %s, NULL as %s, ? AS _fivetran_start " +
                         "FROM %s " +
                         "WHERE _fivetran_active AND %s IS NOT NULL AND _fivetran_start < ?",
                 escapeTable(database, table),
@@ -1195,9 +1208,10 @@ public class JDBCUtil {
                 escapeIdentifier(column),
                 escapeTable(database, table),
                 escapeIdentifier(column)
-        ), null, null);
-        insertQuery.addParameter(operationTimestamp, DataType.NAIVE_DATETIME);
-        insertQuery.addParameter(operationTimestamp, DataType.NAIVE_DATETIME);
+        ), null, null)
+            .addParameter(operationTimestamp, DataType.NAIVE_DATETIME)
+            .addParameter(operationTimestamp, DataType.NAIVE_DATETIME);
+        logger.error(insertQuery.getQuery());
 
         QueryWithCleanup updateQuery = new QueryWithCleanup(String.format("UPDATE %s " +
                         "SET _fivetran_end = DATE_SUB(?,  INTERVAL 1 MICROSECOND), _fivetran_active = FALSE " +
