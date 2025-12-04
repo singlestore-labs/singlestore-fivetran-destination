@@ -643,9 +643,8 @@ public class JDBCUtil {
     private static boolean checkTableNonEmpty(SingleStoreConfiguration conf, String database, String table) throws Exception {
         try (Connection conn = JDBCUtil.createConnection(conf);
             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM " + escapeTable(database, table))) {
-            rs.next();
-            return rs.getLong(1) > 0;
+             ResultSet rs = stmt.executeQuery(String.format("SELECT 1 FROM %s LIMIT 1", escapeTable(database, table)))) {
+            return rs.next();
         }
     }
 
@@ -1211,7 +1210,6 @@ public class JDBCUtil {
         ), null, null)
             .addParameter(operationTimestamp, DataType.NAIVE_DATETIME)
             .addParameter(operationTimestamp, DataType.NAIVE_DATETIME);
-        logger.error(insertQuery.getQuery());
 
         QueryWithCleanup updateQuery = new QueryWithCleanup(String.format("UPDATE %s " +
                         "SET _fivetran_end = DATE_SUB(?,  INTERVAL 1 MICROSECOND), _fivetran_active = FALSE " +
