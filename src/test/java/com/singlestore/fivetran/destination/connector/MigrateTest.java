@@ -753,4 +753,92 @@ public class MigrateTest extends IntegrationTestBase {
             });
         }
     }
+
+    @Test
+    public void addColumnInHistoryMode() throws Exception {
+        try (Connection conn = JDBCUtil.createConnection(conf);
+             Statement stmt = conn.createStatement();) {
+            stmt.execute(String.format("USE %s", database));
+            stmt.execute("CREATE TABLE addColumnInHistoryMode(a INT, _fivetran_start DATETIME(6), _fivetran_end DATETIME(6), _fivetran_active BOOL, PRIMARY KEY(_fivetran_start, a))");
+
+            final MigrateRequest emptyRequest = MigrateRequest.newBuilder()
+                .putAllConfiguration(confMap)
+                .setDetails(MigrationDetails.newBuilder()
+                    .setTable("addColumnInHistoryMode")
+                    .setSchema(database)
+                    .setAdd(
+                        AddOperation.newBuilder()
+                            .setAddColumnInHistoryMode(
+                                AddColumnInHistoryMode.newBuilder()
+                                    .setColumn("b")
+                                    .setColumnType(DataType.INT)
+                                    .setOperationTimestamp("2021-01-01 01:01:01")
+                                    .setDefaultValue("3")
+                            )
+                    )
+                ).build();
+            List<JDBCUtil.QueryWithCleanup> queries = JDBCUtil.generateMigrateQueries(emptyRequest, testWarningHandle);
+            Assertions.assertEquals(1, queries.size());
+
+            stmt.execute("INSERT INTO addColumnInHistoryMode VALUES (1, '2020-01-01 01:01:01', '2021-01-01 01:01:01', 0), (2, '2020-01-01 01:01:01', '9999-12-31 11:59:59.999999', 1)");
+
+            MigrateRequest request = MigrateRequest.newBuilder()
+                .putAllConfiguration(confMap)
+                .setDetails(MigrationDetails.newBuilder()
+                    .setTable("addColumnInHistoryMode")
+                    .setSchema(database)
+                    .setAdd(
+                        AddOperation.newBuilder()
+                            .setAddColumnInHistoryMode(
+                                AddColumnInHistoryMode.newBuilder()
+                                    .setColumn("b")
+                                    .setColumnType(DataType.INT)
+                                    .setOperationTimestamp("2021-01-01 01:01:01")
+                                    .setDefaultValue("3")
+                            )
+                    )
+                ).build();
+
+            queries = JDBCUtil.generateMigrateQueries(request, testWarningHandle);
+            for (JDBCUtil.QueryWithCleanup q : queries) {
+                q.execute(conn);
+            }
+
+            Table t = JDBCUtil.getTable(conf, database, "addColumnInHistoryMode", "addColumnInHistoryMode", testWarningHandle);
+            List<Column> columns = t.getColumnsList();
+            Assertions.assertEquals("a", columns.get(0).getName());
+            Assertions.assertEquals("b", columns.get(4).getName());
+            Assertions.assertEquals(DataType.INT, columns.get(4).getType());
+            Assertions.assertEquals("_fivetran_start", columns.get(1).getName());
+            Assertions.assertEquals("_fivetran_end", columns.get(2).getName());
+            Assertions.assertEquals("_fivetran_active", columns.get(3).getName());
+            Assertions.assertEquals(5, columns.size());
+
+            checkResult("SELECT a, b, _fivetran_start, _fivetran_end, _fivetran_active FROM addColumnInHistoryMode ORDER BY _fivetran_start, a", Arrays.asList(
+                Arrays.asList("1", null, "2020-01-01 01:01:01.000000", "2021-01-01 01:01:01.000000", "0"),
+                Arrays.asList("2", null, "2020-01-01 01:01:01.000000", "2021-01-01 01:01:00.999999", "0"),
+                Arrays.asList("2", "3", "2021-01-01 01:01:01.000000", "9999-12-31 11:59:59.999999", "1")
+            ));
+
+            Assertions.assertThrows(IllegalArgumentException.class, () -> {
+                final MigrateRequest invalidRequest = MigrateRequest.newBuilder()
+                    .putAllConfiguration(confMap)
+                    .setDetails(MigrationDetails.newBuilder()
+                        .setTable("addColumnInHistoryMode")
+                        .setSchema(database)
+                        .setAdd(
+                            AddOperation.newBuilder()
+                                .setAddColumnInHistoryMode(
+                                    AddColumnInHistoryMode.newBuilder()
+                                        .setColumn("b")
+                                        .setOperationTimestamp("2001-01-01 01:01:01")
+                                        .setColumnType(DataType.INT)
+                                        .setDefaultValue("3")
+                                )
+                        )
+                    ).build();
+                JDBCUtil.generateMigrateQueries(invalidRequest, testWarningHandle);
+            });
+        }
+    }
 }
