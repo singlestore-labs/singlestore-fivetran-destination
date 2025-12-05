@@ -396,13 +396,13 @@ public class MigrateTest extends IntegrationTestBase {
             Table t = JDBCUtil.getTable(conf, database, "softDeleteToHistory", "softDeleteToHistory", testWarningHandle);
             List<Column> columns = t.getColumnsList();
             Assertions.assertEquals("a", columns.get(0).getName());
-            Assertions.assertEquals("_fivetran_start", columns.get(3).getName());
-            Assertions.assertEquals("_fivetran_end", columns.get(4).getName());
-            Assertions.assertEquals("_fivetran_active", columns.get(5).getName());
+            Assertions.assertEquals("_fivetran_start", columns.get(2).getName());
+            Assertions.assertEquals("_fivetran_end", columns.get(3).getName());
+            Assertions.assertEquals("_fivetran_active", columns.get(4).getName());
+            Assertions.assertEquals(DataType.NAIVE_DATETIME, columns.get(2).getType());
             Assertions.assertEquals(DataType.NAIVE_DATETIME, columns.get(3).getType());
-            Assertions.assertEquals(DataType.NAIVE_DATETIME, columns.get(4).getType());
-            Assertions.assertEquals(DataType.BOOLEAN, columns.get(5).getType());
-            Assertions.assertTrue(columns.get(3).getPrimaryKey());
+            Assertions.assertEquals(DataType.BOOLEAN, columns.get(4).getType());
+            Assertions.assertTrue(columns.get(2).getPrimaryKey());
 
             checkResult("SELECT a, _fivetran_start, _fivetran_end, _fivetran_active FROM softDeleteToHistory ORDER BY a", Arrays.asList(
                     Arrays.asList("1", "2020-01-01 01:01:01.000000", "9999-12-31 23:59:59.999999", "1"),
