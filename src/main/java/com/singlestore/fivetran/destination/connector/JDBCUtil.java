@@ -684,7 +684,7 @@ public class JDBCUtil {
                             return new ArrayList<>();
                         }
                         if (!checkMaxStartTime(conf, database, table, dropColumnInHistoryMode.getOperationTimestamp())) {
-                            throw new IllegalArgumentException("Cannot drop column in history mode because maximum _fivetran_start is greater then the operation timestamp");
+                            throw new IllegalArgumentException("Cannot drop column in history mode because maximum _fivetran_start is greater than the operation timestamp");
                         }
 
                         t = getTable(conf, database, table, details.getTable(), warningHandler);
