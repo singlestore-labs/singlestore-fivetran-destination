@@ -640,6 +640,28 @@ public class JDBCUtil {
         return originalName + "_tmp_" + Integer.toHexString(new Random().nextInt(0x1000000));
     }
 
+    private static boolean checkTableNonEmpty(SingleStoreConfiguration conf, String database, String table) throws Exception {
+        try (Connection conn = JDBCUtil.createConnection(conf);
+            Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(String.format("SELECT 1 FROM %s LIMIT 1", escapeTable(database, table)))) {
+            return rs.next();
+        }
+    }
+
+    private static boolean checkMaxStartTime(SingleStoreConfiguration conf, String database, String table, String maxTime) throws Exception {
+        try (
+            Connection conn = JDBCUtil.createConnection(conf);
+            PreparedStatement stmt = conn.prepareStatement(
+                String.format("SELECT MAX(_fivetran_start) < ? FROM %s", escapeTable(database, table)));
+        ) {
+            setParameter(stmt, 1, DataType.NAIVE_DATETIME, maxTime, "NULL");
+            try (ResultSet rs = stmt.executeQuery()) {
+                rs.next();
+                return rs.getBoolean(1);
+            }
+        }
+    }
+
     static List<QueryWithCleanup> generateMigrateQueries(MigrateRequest request, WarningHandler warningHandler) throws Exception {
         SingleStoreConfiguration conf = new SingleStoreConfiguration(request.getConfigurationMap());
 
@@ -656,8 +678,17 @@ public class JDBCUtil {
                     case DROP_TABLE:
                         return generateMigrateDropQueries(table, database);
                     case DROP_COLUMN_IN_HISTORY_MODE:
-                        // TODO: PLAT-7714
-                        return new ArrayList<>();
+                        DropColumnInHistoryMode dropColumnInHistoryMode = drop.getDropColumnInHistoryMode();
+
+                        if (!checkTableNonEmpty(conf, database, table)) {
+                            return new ArrayList<>();
+                        }
+                        if (!checkMaxStartTime(conf, database, table, dropColumnInHistoryMode.getOperationTimestamp())) {
+                            throw new IllegalArgumentException("Cannot drop column in history mode because maximum _fivetran_start is greater than the operation timestamp");
+                        }
+
+                        t = getTable(conf, database, table, details.getTable(), warningHandler);
+                        return generateDropColumnInHistoryMode(drop.getDropColumnInHistoryMode(), t, database, table);
                     default:
                         throw new IllegalArgumentException("Unsupported drop operation");
                 }
@@ -1153,5 +1184,42 @@ public class JDBCUtil {
                 new QueryWithCleanup(createTableQuery, null, null),
                 new QueryWithCleanup(populateDataQuery, String.format("DROP TABLE IF EXISTS %s", escapeTable(database, toTable)), null)
         );
+    }
+
+    static List<QueryWithCleanup> generateDropColumnInHistoryMode(DropColumnInHistoryMode migration, Table t, String database, String table) {
+        String column = migration.getColumn();
+        String operationTimestamp = migration.getOperationTimestamp();
+
+        QueryWithCleanup insertQuery = new QueryWithCleanup(String.format("INSERT INTO %s (%s, %s, _fivetran_start) " +
+                        "SELECT %s, NULL as %s, ? AS _fivetran_start " +
+                        "FROM %s " +
+                        "WHERE _fivetran_active AND %s IS NOT NULL AND _fivetran_start < ?",
+                escapeTable(database, table),
+                t.getColumnsList().stream()
+                        .filter(c -> !c.getName().equals(column) && !c.getName().equals("_fivetran_start"))
+                        .map(c -> escapeIdentifier(c.getName()))
+                        .collect(Collectors.joining(", ")),
+                escapeIdentifier(column),
+                t.getColumnsList().stream()
+                        .filter(c -> !c.getName().equals(column) && !c.getName().equals("_fivetran_start"))
+                        .map(c -> escapeIdentifier(c.getName()))
+                        .collect(Collectors.joining(", ")),
+                escapeIdentifier(column),
+                escapeTable(database, table),
+                escapeIdentifier(column)
+        ), null, null)
+            .addParameter(operationTimestamp, DataType.NAIVE_DATETIME)
+            .addParameter(operationTimestamp, DataType.NAIVE_DATETIME);
+
+        QueryWithCleanup updateQuery = new QueryWithCleanup(String.format("UPDATE %s " +
+                        "SET _fivetran_end = DATE_SUB(?,  INTERVAL 1 MICROSECOND), _fivetran_active = FALSE " +
+                        "WHERE _fivetran_active AND %s IS NOT NULL AND _fivetran_start < ?",
+                escapeTable(database, table),
+                escapeIdentifier(column)
+        ), null, null);
+        updateQuery.addParameter(operationTimestamp, DataType.NAIVE_DATETIME);
+        updateQuery.addParameter(operationTimestamp, DataType.NAIVE_DATETIME);
+
+        return Arrays.asList(insertQuery, updateQuery);
     }
 }
