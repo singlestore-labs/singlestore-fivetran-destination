@@ -933,35 +933,47 @@ public class JDBCUtil {
                                                                      String table,
                                                                      String softDeleteColumn) {
         // SingleStore doesn't support adding PK columns, so the table needs to be recreated from scratch.
+        List<Column> tempTableColumns = t.getColumnsList().stream()
+            .filter(c -> !c.getName().equals(softDeleteColumn))
+            .collect(Collectors.toList());
+        tempTableColumns.add(
+            Column.newBuilder()
+                .setName("_fivetran_start")
+                .setType(DataType.NAIVE_DATETIME)
+                .setPrimaryKey(true)
+                .build()
+        );
+        tempTableColumns.add(
+            Column.newBuilder()
+                .setName("_fivetran_end")
+                .setType(DataType.NAIVE_DATETIME)
+                .build()
+        );
+        tempTableColumns.add(
+            Column.newBuilder()
+                .setName("_fivetran_active")
+                .setType(DataType.BOOLEAN)
+                .build()
+        );
+
         String tempTableName = getTempName(table);
-        Table tempTable = t.toBuilder()
-                .setName(tempTableName)
-                .addColumns(
-                        Column.newBuilder()
-                                .setName("_fivetran_start")
-                                .setType(DataType.NAIVE_DATETIME)
-                                .setPrimaryKey(true)
-                )
-                .addColumns(
-                        Column.newBuilder()
-                                .setName("_fivetran_end")
-                                .setType(DataType.NAIVE_DATETIME)
-                )
-                .addColumns(
-                        Column.newBuilder()
-                                .setName("_fivetran_active")
-                                .setType(DataType.BOOLEAN)
-                ).build();
+        Table tempTable = Table.newBuilder()
+            .setName(tempTableName)
+            .addAllColumns(tempTableColumns)
+            .build();
         String createTableQuery = generateCreateTableQuery(database, tempTableName, tempTable);
         String populateDataQuery = String.format("INSERT INTO %s " +
                         "WITH _last_sync AS (SELECT MAX(_fivetran_synced) AS _last_sync FROM %s)" +
-                        "SELECT *, " +
+                        "SELECT %s, " +
                         "IF(%s, '1000-01-01 00:00:00.000000', (SELECT _last_sync FROM _last_sync)) AS `_fivetran_start`, " +
                         "IF(%s, '1000-01-01 00:00:00.000000', '9999-12-31 23:59:59.999999') AS `_fivetran_end`, " +
                         "IF(%s, FALSE, TRUE) AS `_fivetran_active` " +
                         "FROM %s",
                 escapeTable(database, tempTableName),
                 escapeTable(database, table),
+                t.getColumnsList().stream()
+                    .filter(c -> !c.getName().equals(softDeleteColumn))
+                    .map(c -> escapeIdentifier(c.getName())).collect(Collectors.joining(", ")),
                 escapeIdentifier(softDeleteColumn),
                 escapeIdentifier(softDeleteColumn),
                 escapeIdentifier(softDeleteColumn),
