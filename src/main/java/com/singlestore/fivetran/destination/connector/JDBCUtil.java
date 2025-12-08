@@ -746,8 +746,15 @@ public class JDBCUtil {
                 AddOperation add = details.getAdd();
                 switch (add.getEntityCase()) {
                     case ADD_COLUMN_IN_HISTORY_MODE:
-                        // TODO: PLAT-7722
-                        return new ArrayList<>();
+                        AddColumnInHistoryMode addColumnInHistoryMode = add.getAddColumnInHistoryMode();
+
+                        boolean isEmpty = !checkTableNonEmpty(conf, database, table);
+                        if (!isEmpty && !checkMaxStartTime(conf, database, table, addColumnInHistoryMode.getOperationTimestamp())) {
+                            throw new IllegalArgumentException("Cannot add column in history mode because maximum _fivetran_start is greater than the operation timestamp");
+                        }
+
+                        t = getTable(conf, database, table, details.getTable(), warningHandler);
+                        return generateAddColumnInHistoryMode(addColumnInHistoryMode, t, database, table, isEmpty);
                     case ADD_COLUMN_WITH_DEFAULT_VALUE:
                         return generateMigrateAddColumnWithDefaultValue(add.getAddColumnWithDefaultValue(), table, database);
                     default:
@@ -1233,5 +1240,58 @@ public class JDBCUtil {
         updateQuery.addParameter(operationTimestamp, DataType.NAIVE_DATETIME);
 
         return Arrays.asList(insertQuery, updateQuery);
+    }
+
+    static List<QueryWithCleanup> generateAddColumnInHistoryMode(AddColumnInHistoryMode migration, Table t, String database, String table, boolean isEmptyTable) {
+        String column = migration.getColumn();
+        DataType columnType = migration.getColumnType();
+        String defaultValue = migration.getDefaultValue();
+        String operationTimestamp = migration.getOperationTimestamp();
+
+        QueryWithCleanup alterTableQuery = new QueryWithCleanup(
+            String.format("ALTER TABLE %s ADD COLUMN %s %s",
+                escapeTable(database, table),
+                escapeIdentifier(column),
+                JDBCUtil.mapDataTypes(columnType, null)
+            ),
+            null, null);
+
+        if (isEmptyTable) {
+            return Collections.singletonList(alterTableQuery);
+        }
+
+        String dropColumnCleanup = String.format("ALTER TABLE %s DROP COLUMN %s", escapeTable(database, table), escapeIdentifier(column));
+
+        QueryWithCleanup insertQuery = new QueryWithCleanup(String.format("INSERT INTO %s (%s, %s, _fivetran_start) " +
+                "SELECT %s, ? :> %s as %s, ? AS _fivetran_start " +
+                "FROM %s " +
+                "WHERE _fivetran_active AND _fivetran_start < ?",
+            escapeTable(database, table),
+            t.getColumnsList().stream()
+                .filter(c -> !c.getName().equals(column) && !c.getName().equals("_fivetran_start"))
+                .map(c -> escapeIdentifier(c.getName()))
+                .collect(Collectors.joining(", ")),
+            escapeIdentifier(column),
+            t.getColumnsList().stream()
+                .filter(c -> !c.getName().equals(column) && !c.getName().equals("_fivetran_start"))
+                .map(c -> escapeIdentifier(c.getName()))
+                .collect(Collectors.joining(", ")),
+            JDBCUtil.mapDataTypes(columnType, null),
+            escapeIdentifier(column),
+            escapeTable(database, table)
+        ), dropColumnCleanup, null)
+            .addParameter(defaultValue, columnType)
+            .addParameter(operationTimestamp, DataType.NAIVE_DATETIME)
+            .addParameter(operationTimestamp, DataType.NAIVE_DATETIME);
+
+        QueryWithCleanup updateQuery = new QueryWithCleanup(String.format("UPDATE %s " +
+                "SET _fivetran_end = DATE_SUB(?,  INTERVAL 1 MICROSECOND), _fivetran_active = FALSE " +
+                "WHERE _fivetran_active AND _fivetran_start < ?",
+            escapeTable(database, table)
+        ), dropColumnCleanup, null);
+        updateQuery.addParameter(operationTimestamp, DataType.NAIVE_DATETIME);
+        updateQuery.addParameter(operationTimestamp, DataType.NAIVE_DATETIME);
+
+        return Arrays.asList(alterTableQuery, insertQuery, updateQuery);
     }
 }
