@@ -652,7 +652,7 @@ public class JDBCUtil {
         try (
             Connection conn = JDBCUtil.createConnection(conf);
             PreparedStatement stmt = conn.prepareStatement(
-                String.format("SELECT MAX(_fivetran_start) < ? FROM %s", escapeTable(database, table)));
+                String.format("SELECT MAX(_fivetran_start) <= ? FROM %s", escapeTable(database, table)));
         ) {
             setParameter(stmt, 1, DataType.NAIVE_DATETIME, maxTime, "NULL");
             try (ResultSet rs = stmt.executeQuery()) {

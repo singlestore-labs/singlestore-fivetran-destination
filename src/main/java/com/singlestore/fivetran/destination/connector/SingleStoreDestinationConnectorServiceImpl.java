@@ -1,7 +1,6 @@
 package com.singlestore.fivetran.destination.connector;
 
 import com.singlestore.fivetran.destination.connector.warning_util.WarningHandler;
-import com.singlestore.fivetran.destination.connector.warning_util.WriteBatchWarningHandler;
 import com.singlestore.fivetran.destination.connector.writers.*;
 import fivetran_sdk.v2.*;
 import io.grpc.stub.StreamObserver;
@@ -211,9 +210,6 @@ public class SingleStoreDestinationConnectorServiceImpl extends DestinationConne
                     .setTask(Task.newBuilder()
                             .setMessage(e.getMessage()).build())
                     .build());
-            responseObserver.onNext(CreateTableResponse.newBuilder()
-                    .setSuccess(false)
-                    .build());
             responseObserver.onCompleted();
         }
     }
@@ -265,9 +261,6 @@ public class SingleStoreDestinationConnectorServiceImpl extends DestinationConne
             responseObserver.onNext(AlterTableResponse.newBuilder()
                     .setTask(Task.newBuilder()
                             .setMessage(e.getMessage()).build())
-                    .build());
-            responseObserver.onNext(AlterTableResponse.newBuilder()
-                    .setSuccess(false)
                     .build());
             responseObserver.onCompleted();
         }
@@ -332,9 +325,6 @@ public class SingleStoreDestinationConnectorServiceImpl extends DestinationConne
                     .setTask(Task.newBuilder()
                             .setMessage(e.getMessage()).build())
                     .build());
-            responseObserver.onNext(MigrateResponse.newBuilder()
-                    .setSuccess(false)
-                    .build());
             responseObserver.onCompleted();
         }
     }
@@ -370,9 +360,6 @@ public class SingleStoreDestinationConnectorServiceImpl extends DestinationConne
                     .setTask(Task.newBuilder()
                             .setMessage(e.getMessage()).build())
                     .build());
-            responseObserver.onNext(TruncateResponse.newBuilder()
-                    .setSuccess(false)
-                    .build());
             responseObserver.onCompleted();
         }
     }
@@ -394,7 +381,7 @@ public class SingleStoreDestinationConnectorServiceImpl extends DestinationConne
             LoadDataWriter<WriteBatchResponse> w =
                     new LoadDataWriter<>(conn, database, table, request.getTable().getColumnsList(),
                             request.getFileParams(), request.getKeysMap(), conf.batchSize(),
-                            new WriteBatchWarningHandler(responseObserver));
+                            new WarningHandler());
             for (String file : request.getReplaceFilesList()) {
                 w.write(file);
             }
@@ -424,9 +411,6 @@ public class SingleStoreDestinationConnectorServiceImpl extends DestinationConne
                     .setTask(Task.newBuilder()
                             .setMessage(e.getMessage()).build())
                     .build());
-            responseObserver.onNext(WriteBatchResponse.newBuilder()
-                    .setSuccess(false)
-                    .build());
             responseObserver.onCompleted();
         }
     }
@@ -439,7 +423,7 @@ public class SingleStoreDestinationConnectorServiceImpl extends DestinationConne
         String table =
                 JDBCUtil.getTableName(conf, request.getSchemaName(), request.getTable().getName());
 
-        try (Connection conn = JDBCUtil.createConnection(conf);) {
+        try (Connection conn = JDBCUtil.createConnection(conf)) {
             if (request.getTable().getColumnsList().stream()
                     .noneMatch(Column::getPrimaryKey)) {
                 throw new Exception("No primary key found");
@@ -459,7 +443,7 @@ public class SingleStoreDestinationConnectorServiceImpl extends DestinationConne
 
             LoadDataWriter<WriteBatchResponse> w = new LoadDataWriter<>(conn, database, table, request.getTable().getColumnsList(),
                     request.getFileParams(), request.getKeysMap(), conf.batchSize(),
-                    new WriteBatchWarningHandler(responseObserver));
+                    new WarningHandler());
             for (String file : request.getReplaceFilesList()) {
                 w.write(file);
             }
@@ -479,9 +463,6 @@ public class SingleStoreDestinationConnectorServiceImpl extends DestinationConne
             responseObserver.onNext(WriteBatchResponse.newBuilder()
                     .setTask(Task.newBuilder()
                             .setMessage(e.getMessage()).build())
-                    .build());
-            responseObserver.onNext(WriteBatchResponse.newBuilder()
-                    .setSuccess(false)
                     .build());
             responseObserver.onCompleted();
         }
