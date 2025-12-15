@@ -751,6 +751,40 @@ public class MigrateTest extends IntegrationTestBase {
                     ).build();
                 JDBCUtil.generateMigrateQueries(invalidRequest, testWarningHandle);
             });
+
+            stmt.execute("TRUNCATE dropColumnInHistoryMode");
+            stmt.execute("INSERT INTO dropColumnInHistoryMode VALUES (2, 2, '2020-01-01 01:01:01', '9999-12-31 11:59:59.999999', 1)");
+            request = MigrateRequest.newBuilder()
+                    .putAllConfiguration(confMap)
+                    .setDetails(MigrationDetails.newBuilder()
+                            .setTable("dropColumnInHistoryMode")
+                            .setSchema(database)
+                            .setDrop(
+                                    DropOperation.newBuilder()
+                                            .setDropColumnInHistoryMode(
+                                                    DropColumnInHistoryMode.newBuilder()
+                                                            .setColumn("b")
+                                                            .setOperationTimestamp("2020-01-01 01:01:01")
+                                            )
+                            )
+                    ).build();
+            queries = JDBCUtil.generateMigrateQueries(request, testWarningHandle);
+            for (JDBCUtil.QueryWithCleanup q : queries) {
+                q.execute(conn);
+            }
+
+            t = JDBCUtil.getTable(conf, database, "dropColumnInHistoryMode", "dropColumnInHistoryMode", testWarningHandle);
+            columns = t.getColumnsList();
+            Assertions.assertEquals("a", columns.get(0).getName());
+            Assertions.assertEquals("b", columns.get(1).getName());
+            Assertions.assertEquals("_fivetran_start", columns.get(2).getName());
+            Assertions.assertEquals("_fivetran_end", columns.get(3).getName());
+            Assertions.assertEquals("_fivetran_active", columns.get(4).getName());
+            Assertions.assertEquals(5, columns.size());
+
+            checkResult("SELECT * FROM dropColumnInHistoryMode ORDER BY _fivetran_start, a", Arrays.asList(
+                    Arrays.asList("2", null, "2020-01-01 01:01:01.000000", "9999-12-31 11:59:59.999999", "1")
+            ));
         }
     }
 
@@ -839,6 +873,46 @@ public class MigrateTest extends IntegrationTestBase {
                     ).build();
                 JDBCUtil.generateMigrateQueries(invalidRequest, testWarningHandle);
             });
+
+            stmt.execute("DROP TABLE addColumnInHistoryMode");
+            stmt.execute("CREATE TABLE addColumnInHistoryMode(a INT, _fivetran_start DATETIME(6), _fivetran_end DATETIME(6), _fivetran_active BOOL, PRIMARY KEY(_fivetran_start, a))");
+            stmt.execute("INSERT INTO addColumnInHistoryMode VALUES (2, '2020-01-01 01:01:01', '9999-12-31 11:59:59.999999', 1)");
+
+            request = MigrateRequest.newBuilder()
+                    .putAllConfiguration(confMap)
+                    .setDetails(MigrationDetails.newBuilder()
+                            .setTable("addColumnInHistoryMode")
+                            .setSchema(database)
+                            .setAdd(
+                                    AddOperation.newBuilder()
+                                            .setAddColumnInHistoryMode(
+                                                    AddColumnInHistoryMode.newBuilder()
+                                                            .setColumn("b")
+                                                            .setColumnType(DataType.INT)
+                                                            .setOperationTimestamp("2020-01-01 01:01:01")
+                                                            .setDefaultValue("3")
+                                            )
+                            )
+                    ).build();
+
+            queries = JDBCUtil.generateMigrateQueries(request, testWarningHandle);
+            for (JDBCUtil.QueryWithCleanup q : queries) {
+                q.execute(conn);
+            }
+
+            t = JDBCUtil.getTable(conf, database, "addColumnInHistoryMode", "addColumnInHistoryMode", testWarningHandle);
+            columns = t.getColumnsList();
+            Assertions.assertEquals("a", columns.get(0).getName());
+            Assertions.assertEquals("b", columns.get(4).getName());
+            Assertions.assertEquals(DataType.INT, columns.get(4).getType());
+            Assertions.assertEquals("_fivetran_start", columns.get(1).getName());
+            Assertions.assertEquals("_fivetran_end", columns.get(2).getName());
+            Assertions.assertEquals("_fivetran_active", columns.get(3).getName());
+            Assertions.assertEquals(5, columns.size());
+
+            checkResult("SELECT a, b, _fivetran_start, _fivetran_end, _fivetran_active FROM addColumnInHistoryMode ORDER BY _fivetran_start, a", Arrays.asList(
+                    Arrays.asList("2", "3", "2020-01-01 01:01:01.000000", "9999-12-31 11:59:59.999999", "1")
+            ));
         }
     }
 }
