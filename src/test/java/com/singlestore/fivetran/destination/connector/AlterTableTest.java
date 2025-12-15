@@ -1,17 +1,16 @@
 package com.singlestore.fivetran.destination.connector;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import fivetran_sdk.v2.*;
 import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 public class AlterTableTest extends IntegrationTestBase {
 
@@ -354,6 +353,84 @@ public class AlterTableTest extends IntegrationTestBase {
             checkResult(String.format("SELECT * FROM %s.`changeTypeCleanup` ORDER BY a", database),
                     Arrays.asList(Arrays.asList("1"), Arrays.asList("2")));
 
+        }
+    }
+
+    @Test
+    public void dropColumn() throws Exception {
+        try (Connection conn = JDBCUtil.createConnection(conf);
+             Statement stmt = conn.createStatement();) {
+            stmt.execute(String.format("USE %s", database));
+            stmt.execute("CREATE TABLE dropColumn(a INT, b INT)");
+            Table table = Table.newBuilder().setName("dropColumn")
+                    .addAllColumns(Collections.singletonList(
+                            Column.newBuilder().setName("a").setType(DataType.INT).build()
+                    ))
+                    .build();
+
+            AlterTableRequest request = AlterTableRequest.newBuilder().putAllConfiguration(confMap)
+                    .setSchemaName(database).setTable(table).setDropColumns(true).build();
+
+            List<JDBCUtil.QueryWithCleanup> queries = JDBCUtil.generateAlterTableQuery(request, testWarningHandle);
+            for (JDBCUtil.QueryWithCleanup q : queries) {
+                stmt.execute(q.getQuery());
+            }
+            Table result = JDBCUtil.getTable(conf, database, "dropColumn", "dropColumn", testWarningHandle);
+            List<Column> columns = result.getColumnsList();
+
+            assertEquals("a", columns.get(0).getName());
+            assertEquals(DataType.INT, columns.get(0).getType());
+            assertFalse(columns.get(0).getPrimaryKey());
+            assertEquals(1, columns.size());
+        }
+    }
+
+    @Test
+    public void dropPK() throws Exception {
+        try (Connection conn = JDBCUtil.createConnection(conf);
+             Statement stmt = conn.createStatement();) {
+            stmt.execute(String.format("USE %s", database));
+            stmt.execute("CREATE TABLE dropPK(a INT, b INT PRIMARY KEY)");
+            Table table = Table.newBuilder().setName("dropPK")
+                    .addAllColumns(Collections.singletonList(
+                            Column.newBuilder().setName("a").setType(DataType.INT).build()
+                    ))
+                    .build();
+
+            AlterTableRequest request = AlterTableRequest.newBuilder().putAllConfiguration(confMap)
+                    .setSchemaName(database).setTable(table).setDropColumns(true).build();
+
+            List<JDBCUtil.QueryWithCleanup> queries = JDBCUtil.generateAlterTableQuery(request, testWarningHandle);
+            for (JDBCUtil.QueryWithCleanup q : queries) {
+                stmt.execute(q.getQuery());
+            }
+            Table result = JDBCUtil.getTable(conf, database, "dropPK", "dropPK", testWarningHandle);
+            List<Column> columns = result.getColumnsList();
+
+            assertEquals("a", columns.get(0).getName());
+            assertEquals(DataType.INT, columns.get(0).getType());
+            assertFalse(columns.get(0).getPrimaryKey());
+            assertEquals(1, columns.size());
+        }
+    }
+
+    @Test
+    public void dontDrop() throws Exception {
+        try (Connection conn = JDBCUtil.createConnection(conf);
+             Statement stmt = conn.createStatement();) {
+            stmt.execute(String.format("USE %s", database));
+            stmt.execute("CREATE TABLE dontDrop(a INT, b INT)");
+            Table table = Table.newBuilder().setName("dontDrop")
+                    .addAllColumns(Collections.singletonList(
+                            Column.newBuilder().setName("a").setType(DataType.INT).build()
+                    ))
+                    .build();
+
+            AlterTableRequest request = AlterTableRequest.newBuilder().putAllConfiguration(confMap)
+                    .setSchemaName(database).setTable(table).build();
+
+            List<JDBCUtil.QueryWithCleanup> queries = JDBCUtil.generateAlterTableQuery(request, testWarningHandle);
+            assertNull(queries);
         }
     }
 }

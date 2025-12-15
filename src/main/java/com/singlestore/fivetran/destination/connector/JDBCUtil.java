@@ -305,6 +305,7 @@ public class JDBCUtil {
 
         List<Column> columnsToAdd = new ArrayList<>();
         List<Column> columnsToChange = new ArrayList<>();
+        List<Column> columnsToDrop = new ArrayList<>();
         List<Column> commonColumns = new ArrayList<>();
 
         for (Column column : newTable.getColumnsList()) {
@@ -325,12 +326,26 @@ public class JDBCUtil {
             }
         }
 
+        if (request.getDropColumns()) {
+            Set<String> newColumnNames = newTable.getColumnsList().stream()
+                    .map(Column::getName).collect(Collectors.toSet());
+
+            for (Column column : oldTable.getColumnsList()) {
+                if (!newColumnNames.contains(column.getName())) {
+                    columnsToDrop.add(column);
+                    if (column.getPrimaryKey()) {
+                        pkChanged = true;
+                    }
+                }
+            }
+        }
+
         if (pkChanged) {
             warningHandler.handle("Alter table changes the key of the table. This operation is not supported by SingleStore. The table will be recreated from scratch.");
 
             return generateRecreateTableQuery(database, table, newTable, commonColumns);
         } else {
-            return generateAlterTableQuery(database, table, columnsToAdd, columnsToChange);
+            return generateAlterTableQuery(database, table, columnsToAdd, columnsToChange, columnsToDrop);
         }
     }
 
@@ -385,8 +400,8 @@ public class JDBCUtil {
     }
 
     static List<QueryWithCleanup> generateAlterTableQuery(String database, String table, List<Column> columnsToAdd,
-                                                          List<Column> columnsToChange) {
-        if (columnsToAdd.isEmpty() && columnsToChange.isEmpty()) {
+                                                          List<Column> columnsToChange, List<Column> columnsToDrop) {
+        if (columnsToAdd.isEmpty() && columnsToChange.isEmpty() && columnsToDrop.isEmpty()) {
             return null;
         }
 
@@ -423,6 +438,17 @@ public class JDBCUtil {
             String addColumnsQuery = String.format("ALTER TABLE %s %s; ",
                     escapeTable(database, table), String.join(", ", addOperations));
             queries.add(new QueryWithCleanup(addColumnsQuery, null, null));
+        }
+
+        if (!columnsToDrop.isEmpty()) {
+            List<String> dropOperations = new ArrayList<>();
+
+            columnsToDrop.forEach(column -> dropOperations
+                    .add(String.format("DROP %s", escapeIdentifier(column.getName()))));
+
+            String dropColumnsQuery = String.format("ALTER TABLE %s %s; ",
+                    escapeTable(database, table), String.join(", ", dropOperations));
+            queries.add(new QueryWithCleanup(dropColumnsQuery, null, null));
         }
 
         return queries;
