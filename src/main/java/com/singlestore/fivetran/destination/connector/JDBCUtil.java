@@ -674,20 +674,6 @@ public class JDBCUtil {
         }
     }
 
-    private static boolean checkMaxStartTime(SingleStoreConfiguration conf, String database, String table, String maxTime) throws Exception {
-        try (
-            Connection conn = JDBCUtil.createConnection(conf);
-            PreparedStatement stmt = conn.prepareStatement(
-                String.format("SELECT MAX(_fivetran_start) <= ? FROM %s", escapeTable(database, table)));
-        ) {
-            setParameter(stmt, 1, DataType.NAIVE_DATETIME, maxTime, "NULL");
-            try (ResultSet rs = stmt.executeQuery()) {
-                rs.next();
-                return rs.getBoolean(1);
-            }
-        }
-    }
-
     static List<QueryWithCleanup> generateMigrateQueries(MigrateRequest request, WarningHandler warningHandler) throws Exception {
         SingleStoreConfiguration conf = new SingleStoreConfiguration(request.getConfigurationMap());
 
@@ -708,9 +694,6 @@ public class JDBCUtil {
 
                         if (!checkTableNonEmpty(conf, database, table)) {
                             return new ArrayList<>();
-                        }
-                        if (!checkMaxStartTime(conf, database, table, dropColumnInHistoryMode.getOperationTimestamp())) {
-                            throw new IllegalArgumentException("Cannot drop column in history mode because maximum _fivetran_start is greater than the operation timestamp");
                         }
 
                         t = getTable(conf, database, table, details.getTable(), warningHandler);
@@ -775,9 +758,6 @@ public class JDBCUtil {
                         AddColumnInHistoryMode addColumnInHistoryMode = add.getAddColumnInHistoryMode();
 
                         boolean isEmpty = !checkTableNonEmpty(conf, database, table);
-                        if (!isEmpty && !checkMaxStartTime(conf, database, table, addColumnInHistoryMode.getOperationTimestamp())) {
-                            throw new IllegalArgumentException("Cannot add column in history mode because maximum _fivetran_start is greater than the operation timestamp");
-                        }
 
                         t = getTable(conf, database, table, details.getTable(), warningHandler);
                         return generateAddColumnInHistoryMode(addColumnInHistoryMode, t, database, table, isEmpty);
@@ -1235,6 +1215,11 @@ public class JDBCUtil {
         String column = migration.getColumn();
         String operationTimestamp = migration.getOperationTimestamp();
 
+        QueryWithCleanup deleteQuery = new QueryWithCleanup(String.format("DELETE FROM %s WHERE _fivetran_start > ? AND _fivetran_active",
+                escapeTable(database, table)
+        ), null, null)
+            .addParameter(operationTimestamp, DataType.NAIVE_DATETIME);
+
         QueryWithCleanup insertQuery = new QueryWithCleanup(String.format("INSERT INTO %s (%s, %s, _fivetran_start) " +
                         "SELECT %s, NULL as %s, ? AS _fivetran_start " +
                         "FROM %s " +
@@ -1268,7 +1253,7 @@ public class JDBCUtil {
         updateQuery.addParameter(operationTimestamp, DataType.NAIVE_DATETIME);
         updateQuery.addParameter(operationTimestamp, DataType.NAIVE_DATETIME);
 
-        return Arrays.asList(insertQuery, updateQuery);
+        return Arrays.asList(deleteQuery, insertQuery, updateQuery);
     }
 
     static List<QueryWithCleanup> generateAddColumnInHistoryMode(AddColumnInHistoryMode migration, Table t, String database, String table, boolean isEmptyTable) {
@@ -1288,6 +1273,11 @@ public class JDBCUtil {
         if (isEmptyTable) {
             return Collections.singletonList(alterTableQuery);
         }
+
+        QueryWithCleanup deleteQuery = new QueryWithCleanup(String.format("DELETE FROM %s WHERE _fivetran_start > ? AND _fivetran_active",
+                escapeTable(database, table)
+        ), null, null)
+                .addParameter(operationTimestamp, DataType.NAIVE_DATETIME);
 
         String dropColumnCleanup = String.format("ALTER TABLE %s DROP COLUMN %s", escapeTable(database, table), escapeIdentifier(column));
 
@@ -1324,6 +1314,6 @@ public class JDBCUtil {
         updateQuery.addParameter(operationTimestamp, DataType.NAIVE_DATETIME);
         updateQuery.addParameter(operationTimestamp, DataType.NAIVE_DATETIME);
 
-        return Arrays.asList(alterTableQuery, insertQuery, updateQuery);
+        return Arrays.asList(alterTableQuery, deleteQuery, insertQuery, updateQuery);
     }
 }
