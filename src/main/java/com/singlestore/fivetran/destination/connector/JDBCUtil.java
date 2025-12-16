@@ -1238,7 +1238,8 @@ public class JDBCUtil {
         QueryWithCleanup insertQuery = new QueryWithCleanup(String.format("INSERT INTO %s (%s, %s, _fivetran_start) " +
                         "SELECT %s, NULL as %s, ? AS _fivetran_start " +
                         "FROM %s " +
-                        "WHERE _fivetran_active AND %s IS NOT NULL AND _fivetran_start < ?",
+                        "WHERE _fivetran_active AND %s IS NOT NULL AND _fivetran_start <= ?" +
+                        "ON DUPLICATE KEY UPDATE %s = NULL, _fivetran_start = ?",
                 escapeTable(database, table),
                 t.getColumnsList().stream()
                         .filter(c -> !c.getName().equals(column) && !c.getName().equals("_fivetran_start"))
@@ -1251,8 +1252,10 @@ public class JDBCUtil {
                         .collect(Collectors.joining(", ")),
                 escapeIdentifier(column),
                 escapeTable(database, table),
+                escapeIdentifier(column),
                 escapeIdentifier(column)
         ), null, null)
+            .addParameter(operationTimestamp, DataType.NAIVE_DATETIME)
             .addParameter(operationTimestamp, DataType.NAIVE_DATETIME)
             .addParameter(operationTimestamp, DataType.NAIVE_DATETIME);
 
@@ -1289,9 +1292,10 @@ public class JDBCUtil {
         String dropColumnCleanup = String.format("ALTER TABLE %s DROP COLUMN %s", escapeTable(database, table), escapeIdentifier(column));
 
         QueryWithCleanup insertQuery = new QueryWithCleanup(String.format("INSERT INTO %s (%s, %s, _fivetran_start) " +
-                "SELECT %s, ? :> %s as %s, ? AS _fivetran_start " +
+                "SELECT %s, ? as %s, ? AS _fivetran_start " +
                 "FROM %s " +
-                "WHERE _fivetran_active AND _fivetran_start < ?",
+                "WHERE _fivetran_active AND _fivetran_start <= ?" +
+                "ON DUPLICATE KEY UPDATE %s = ?, _fivetran_start = ?",
             escapeTable(database, table),
             t.getColumnsList().stream()
                 .filter(c -> !c.getName().equals(column) && !c.getName().equals("_fivetran_start"))
@@ -1302,12 +1306,14 @@ public class JDBCUtil {
                 .filter(c -> !c.getName().equals(column) && !c.getName().equals("_fivetran_start"))
                 .map(c -> escapeIdentifier(c.getName()))
                 .collect(Collectors.joining(", ")),
-            JDBCUtil.mapDataTypes(columnType, null),
             escapeIdentifier(column),
-            escapeTable(database, table)
+            escapeTable(database, table),
+            escapeIdentifier(column)
         ), dropColumnCleanup, null)
             .addParameter(defaultValue, columnType)
             .addParameter(operationTimestamp, DataType.NAIVE_DATETIME)
+            .addParameter(operationTimestamp, DataType.NAIVE_DATETIME)
+            .addParameter(defaultValue, columnType)
             .addParameter(operationTimestamp, DataType.NAIVE_DATETIME);
 
         QueryWithCleanup updateQuery = new QueryWithCleanup(String.format("UPDATE %s " +
