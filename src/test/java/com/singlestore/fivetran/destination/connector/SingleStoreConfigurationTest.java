@@ -11,7 +11,7 @@ public class SingleStoreConfigurationTest extends IntegrationTestBase {
     public void defaultValues() throws Exception {
         SingleStoreConfiguration conf = new SingleStoreConfiguration(ImmutableMap.of("host", host,
                 "port", port, "user", user, "database", "", "password", "", "driver.parameters", "",
-                "ssl.mode", "", "ssl.server.cert", "", "batch.size", ""));
+                "ssl.mode", "", "ssl.server.cert", "", "batch.size", "", "database.name.mapping", "a=b;c=d"));
         assertEquals(host, conf.host());
         assertEquals(Integer.valueOf(port), conf.port());
         assertEquals(user, conf.user());
@@ -21,6 +21,9 @@ public class SingleStoreConfigurationTest extends IntegrationTestBase {
         assertEquals("disable", conf.sslMode());
         assertNull(conf.sslServerCert());
         assertEquals(10000, conf.batchSize());
+        assertEquals("b", conf.getSingleStoreDatabase("a"));
+        assertEquals("d", conf.getSingleStoreDatabase("c"));
+        assertEquals("e", conf.getSingleStoreDatabase("e"));
     }
 
     @Test

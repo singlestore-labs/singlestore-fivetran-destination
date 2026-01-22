@@ -1,5 +1,7 @@
 package com.singlestore.fivetran.destination.connector;
 
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 
 public class SingleStoreConfiguration {
@@ -12,6 +14,7 @@ public class SingleStoreConfiguration {
     private final String sslServerCert;
     private final String driverParameters;
     private final Integer batchSize;
+    private final Map<String, String> fivetranSchemaToSingleStoreDatabase = new HashMap<>();
 
     SingleStoreConfiguration(Map<String, String> conf) {
         this.host = conf.get("host");
@@ -23,6 +26,21 @@ public class SingleStoreConfiguration {
         this.sslServerCert = formatServerCert(withDefaultNull(conf.get("ssl.server.cert")));
         this.driverParameters = withDefaultNull(conf.get("driver.parameters"));
         this.batchSize = Integer.valueOf(withDefault(conf.get("batch.size"), "10000"));
+        String databaseNameMapping = withDefault(conf.get("database.name.mapping"), "");
+        Arrays.stream(databaseNameMapping.split(";")).forEach(mapping -> {
+            if (mapping.isEmpty()) {
+                return;
+            }
+
+            String[] parts = mapping.split("=");
+            if (parts.length == 2) {
+                String fivetranSchema = parts[0].trim();
+                String singleStoreDatabase = parts[1].trim();
+                fivetranSchemaToSingleStoreDatabase.put(fivetranSchema, singleStoreDatabase);
+            } else {
+                throw new IllegalArgumentException(String.format("Invalid database name mapping: %s", mapping));
+            }
+        });
     }
 
     private String formatServerCert(String cert) {
@@ -83,5 +101,9 @@ public class SingleStoreConfiguration {
 
     public Integer batchSize() {
         return batchSize;
+    }
+
+    public String getSingleStoreDatabase(String fivetranSchema) {
+        return fivetranSchemaToSingleStoreDatabase.getOrDefault(fivetranSchema, fivetranSchema);
     }
 }
