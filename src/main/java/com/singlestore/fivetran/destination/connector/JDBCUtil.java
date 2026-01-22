@@ -650,7 +650,7 @@ public class JDBCUtil {
         if (conf.database() != null) {
             return conf.database();
         } else {
-            return schema;
+            return conf.getSingleStoreDatabase(schema);
         }
     }
 

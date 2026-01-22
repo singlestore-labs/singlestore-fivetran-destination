@@ -42,6 +42,14 @@ public class SingleStoreDestinationConnectorServiceImpl extends DestinationConne
                                                 + "If this option is not specified, appropriate SingleStore database will be created for each schema.\n"
                                                 + "'CREATE DATABASE' permissions are required in this case.")
                                 .setTextField(TextField.PlainText).build(),
+                        FormField.newBuilder().setName("database.name.mapping").setLabel("Database Name Mapping")
+                                .setRequired(false)
+                                .setDescription(
+                                        "Mapping of Fivetran schema names to SingleStore database names.\n"
+                                                + "Format: 'schema1=database1;schema2=database2;...'.\n"
+                                                + "If a schema is not present in this mapping, the schema name will be used as the database name.\n"
+                                                + "This option is ignored if `Database` option is specified.")
+                                .setTextField(TextField.PlainText).build(),
                         FormField.newBuilder().setName("user").setLabel("Username")
                                 .setRequired(true).setTextField(TextField.PlainText).build(),
                         FormField.newBuilder().setName("password").setLabel("Password")

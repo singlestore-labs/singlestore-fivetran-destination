@@ -23,7 +23,7 @@ gradle jar
 2. Run the Jar
 
 ```
-java -jar build/libs/singlestore-fivetran-destination-connector-3.0.0.jar
+java -jar build/libs/singlestore-fivetran-destination-connector-3.0.1.jar
 ```
 
 ## Steps for running Java tests

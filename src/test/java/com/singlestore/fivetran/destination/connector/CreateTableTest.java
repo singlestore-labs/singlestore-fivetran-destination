@@ -8,6 +8,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import com.google.common.collect.ImmutableMap;
 import com.singlestore.fivetran.destination.connector.writers.LoadDataWriter;
 import fivetran_sdk.v2.*;
 import org.junit.jupiter.api.Test;
@@ -254,6 +255,40 @@ public class CreateTableTest extends IntegrationTestBase {
                     }
                 }
                 assertTrue(databaseCreated);
+            }
+        }
+    }
+
+    @Test
+    public void databaseNameMapping() throws Exception {
+        Table t = Table.newBuilder().setName("databaseNameMapping").addAllColumns(Arrays.asList(Column
+                .newBuilder().setName("a").setType(DataType.INT).setPrimaryKey(false).build()))
+            .build();
+
+        CreateTableRequest request =
+            CreateTableRequest.newBuilder().setSchemaName("fivSchema").setTable(t).build();
+
+        SingleStoreConfiguration conf = new SingleStoreConfiguration(
+            ImmutableMap.of("host", host, "port", port, "user", user, "password", password,
+                "database.name.mapping", "fivSchema=db1"));
+        try (Connection conn = JDBCUtil.createConnection(conf);
+             Statement stmt = conn.createStatement();) {
+            String query = JDBCUtil.generateCreateTableQuery(conf, stmt, request);
+            stmt.execute(query);
+
+            try {
+                try (ResultSet resultSet = conn.getMetaData().getCatalogs();) {
+                    boolean databaseCreated = false;
+                    while (resultSet.next()) {
+                        String databaseName = resultSet.getString(1);
+                        if (databaseName.equals(database)) {
+                            databaseCreated = true;
+                        }
+                    }
+                    assertTrue(databaseCreated);
+                }
+            } finally {
+                stmt.execute(String.format("DROP DATABASE IF EXISTS %s", "db1"));
             }
         }
     }
