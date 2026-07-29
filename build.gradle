@@ -19,7 +19,7 @@ repositories {
     mavenCentral()
 }
 
-version = '3.0.1'
+version = providers.gradleProperty('version').orElse('0.0.0-SNAPSHOT').get()
 
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
