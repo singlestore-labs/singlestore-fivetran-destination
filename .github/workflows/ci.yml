@@ -127,7 +127,7 @@ jobs:
             -storetype TRUSTEDSIGNING \
             -storepass "$AZURE_ACCESS_TOKEN" \
             -tsa "http://timestamp.acs.microsoft.com" \
-            "build/libs/singlestore-fivetran-source-connector-${{ env.RELEASE_VERSION }}.jar" "$ALIAS"
+            "build/libs/singlestore-fivetran-destination-connector-${{ env.RELEASE_VERSION }}.jar" "$ALIAS"
       # The Trusted Signing root is not shipped in the JDK truststore, so without
       # it jarsigner reports the signer and timestamp chains as unverifiable.
       - name: Trust the Azure Trusted Signing root CA
@@ -149,7 +149,7 @@ jobs:
             -file msroot2020.crt
       - name: Verify signed JARs
         if: ${{ success() }}
-        run: jarsigner -verify "build/libs/singlestore-fivetran-source-connector-${{ env.RELEASE_VERSION }}.jar" -strict
+        run: jarsigner -verify "build/libs/singlestore-fivetran-destination-connector-${{ env.RELEASE_VERSION }}.jar" -strict
       - name: Release on GitHub
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
