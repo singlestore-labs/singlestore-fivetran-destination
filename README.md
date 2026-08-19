@@ -91,7 +91,8 @@ To release a new version:
 
    - Runs the test matrix
    - Builds the connector JAR with the release version
-   - Creates a [GitHub Release](https://github.com/singlestore-labs/singlestore-fivetran-destination/releases) with auto-generated release notes and the JAR (`singlestore-fivetran-destination-connector-<version>.jar`)
+   - Signs the JAR with Azure Trusted Signing and verifies the signature
+   - Creates a [GitHub Release](https://github.com/singlestore-labs/singlestore-fivetran-destination/releases) with auto-generated release notes and the signed JAR (`singlestore-fivetran-destination-connector-<version>.jar`)
 
 2. After the GitHub Release is published, post a message in the `#ext-fivetran-singlestore` Slack channel asking Fivetran to upload the updated connector. Replace `<version>` with the release version (for example, `1.2.9` for tag `v1.2.9`):
 
